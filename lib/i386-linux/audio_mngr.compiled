@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Compiler Value="/usr/local/codetyphon/fpc/fpc64/bin/x86_64-linux/fpc" Date="1572270259"/>
+  <Params Value=" -Tlinux -Pi386 -Cp80386 -MObjFPC -Scghi -CX -Os1 -Xs -XX -l -vewnhibq -Fi/home/daniel/Dokumente/060_Lazarus-Projekte/000_Neustart-2017-08/Tools/AudioManager/lib/i386-linux -Fl/usr/local/codetyphon/binLibraries/i386-linux -Fu/usr/local/codetyphon/typhon/lcl/units/i386-linux/gtk2 -Fu/usr/local/codetyphon/typhon/lcl/units/i386-linux -Fu/usr/local/codetyphon/typhon/components/BaseUtils/lib/i386-linux -Fu/usr/local/codetyphon/typhon/packager/units/i386-linux -Fu/home/daniel/Dokumente/060_Lazarus-Projekte/000_Neustart-2017-08/Tools/AudioManager/ -FU/home/daniel/Dokumente/060_Lazarus-Projekte/000_Neustart-2017-08/Tools/AudioManager/lib/i386-linux/ -FE/home/daniel/Dokumente/060_Lazarus-Projekte/000_Neustart-2017-08/Tools/AudioManager/ -o/home/daniel/Dokumente/060_Lazarus-Projekte/000_Neustart-2017-08/Tools/AudioManager/audio_mngr_i386-linux -dLCL -dadLCL -dLCLgtk2 audio_mngr.ppr"/>
+  <Complete Value="False"/>
+</CONFIG>
