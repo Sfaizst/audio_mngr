@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, Menus, StdCtrls,
-  ComCtrls, ExtCtrls, IniFiles, Process, LCLType, Types; //Clipbrd;
+  ComCtrls, ExtCtrls, IniFiles, Process, LCLType, Types;//, Clipbrd;
 
 
 const
@@ -259,10 +259,8 @@ procedure ReloadPulseDevices(var PD: TPulseDevices; var DefaultSink: String; var
   function IsADevice(StrToCheck: String): Boolean;
     begin
       Result := False;
-      if (Pos('#',StrToCheck) > 0) and (
-         (Pos('Source ',StrToCheck) > 0) or (Pos('Sink ',StrToCheck) > 0) or       
-         (Pos('Karte ',StrToCheck) > 0) or (Pos('Client ',StrToCheck) > 0)) then
-           Result := True;
+      if (Pos('#',StrToCheck) > 0) and (Pos(#9,StrToCheck) = 0) then
+        Result := True;
     end;
   function IsNewDevice(StrToCheck: String): Boolean;
     begin
@@ -1551,6 +1549,8 @@ end;
 procedure TMainFRM.M5_ReloadClick(Sender: TObject);
 begin
   Dev.LoadFromPulse;
+  //Only for debugging:
+  //Clipboard.AsText := RunCMD('pactl list');
 end;
 
 procedure TMainFRM.RC_DelClick(Sender: TObject);
