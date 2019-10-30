@@ -58,10 +58,13 @@ type TPulseDevices = Array of TPulseDevice;
 type
   TDevice = class
   private
+    FMainCaption, FSecCaption: String;
+    FTextHeight: Integer;
     FWidth, FHeight: Integer;
     FX, FY: Integer;
     FSelected: Boolean;
     FOldD: TPulseDevice;
+    procedure FSetCaption;
     procedure SetFX(AX: Integer);
     procedure SetFY(AY: Integer);
     function GetWidth: Integer;     
@@ -77,8 +80,6 @@ type
     property Selected: Boolean read FSelected write FSelected;
     constructor Create(AD: TPulseDevice);
     procedure Paint;
-    procedure Save(var Ini: TIniFile);
-    procedure Load(Ini: TIniFile; AName: String);
   end;
 
 type
@@ -1251,16 +1252,14 @@ begin
 end;
 
 procedure TDevice.Paint;
-const
-  VSinkStr = '[V] ';
 var
   Bitmap: TBitmap;
-  V, S, T: String;
   TX: Integer;
   Col: Integer;
 begin
-  If FOldD.Name <> D.Name then
+  If (FOldD.Name <> D.Name) or (FOldD.Volume <> D.Volume) then
     begin
+      FSetCaption;
       GetWidth;
       GetHeight;
       MainFrm.CalcLab.Caption := '';
@@ -1289,22 +1288,15 @@ begin
         Bitmap.Canvas.Rectangle(1,1,FWidth-10,FHeight-1);
         TX := 5;
       end;
-    If D.VSink = True then
-      S := VSinkStr Else
-      S := '';
     //Eingangspfeil (offen) Links / Oben (Audioeingabe / Lautsprecher):
     if (PDT_Speaker and D.Typ <> 0) then
       begin
-        S := S+'Speaker';
         Bitmap.Canvas.Line(1,1,10,6);
         Bitmap.Canvas.Line(1,11,10,6);
       end;          
     //Ausgangspfeil (offen) Rechts / Oben (Audioausgabe / Player):
     if (PDT_Player and D.Typ <> 0) or (PDT_Loop and D.Typ <> 0) then
       begin
-        if (S <> '') and (S <> VSinkStr) then
-          S := S + ' / Player' Else
-          S := S + 'Player';
         Bitmap.Canvas.Pen.Color := clWhite;
         Bitmap.Canvas.Line(Fwidth -11,4,Fwidth -11,10);
         Bitmap.Canvas.Pen.Color := Col;
@@ -1314,9 +1306,6 @@ begin
     //Eingangspfeil (geschlossen) Rechts / Unten (Audioeingabe / Recorder):
     if (PDT_Recorder and D.Typ <> 0) or (PDT_Loop and D.Typ <> 0) then
       begin
-        if (S <> '') and (S <> VSinkStr) then
-          S := S + ' / Rec' Else
-          S := S +'Rec';
         Bitmap.Canvas.Line(Fwidth,Fheight-1,Fwidth-10,Fheight-6);
         Bitmap.Canvas.Line(Fwidth,Fheight-11,Fwidth-10,Fheight-6);
         Bitmap.Canvas.Line(Fwidth-1,Fheight-1,Fwidth-1,Fheight-11);
@@ -1324,26 +1313,15 @@ begin
     //Ausgangspfeil Unten (Audioausgabe / Player):
     if (PDT_Microfone and D.Typ <> 0) or (PDT_Monitor and D.Typ <> 0) then
       begin
-        if PDT_Monitor and D.Typ <> 0 then
-          T := 'Monitor' Else
-          T := 'Mic';
-        if (S <> '') and (S <> VSinkStr) then
-          S := S + ' / '+T Else
-          S := S + T;
         Bitmap.Canvas.Line(10,Fheight-1,0,Fheight-6);
         Bitmap.Canvas.Line(10,Fheight-11,0,Fheight-6);
       end;
-    If D.Volume <> '' then
-      V := ' ['+D.Volume+'%] ' Else
-      V := '';
-    if (D.Typ = PDT_Loop) then
-      Bitmap.Canvas.TextOut(TX,5,'LOOP') Else
-    if (D.Typ = PDT_Monitor) then
-      Bitmap.Canvas.TextOut(TX,5,S+V) Else
-      begin
-        Bitmap.Canvas.TextOut(TX,5,S+V+':');
-        Bitmap.Canvas.TextOut(TX,20,D.Name);
-      end;
+    if FSecCaption <> '' then
+      begin  
+        Bitmap.Canvas.TextOut(TX,3,FMainCaption);
+        Bitmap.Canvas.TextOut(TX,FTextHeight+3,FSecCaption);
+      end else
+        Bitmap.Canvas.TextOut(TX,3,FMainCaption);
     Dev.FImage.Canvas.Draw(X, Y, Bitmap);
   finally
     Bitmap.Free;
@@ -1366,36 +1344,81 @@ begin
     FY := AY;
 end;
 
-function TDevice.GetWidth: Integer;
+procedure TDevice.FSetCaption;
+const
+  VSinkStr = '[V] ';
+var
+  S, T, V: String;
 begin
-  MainFrm.CalcLab.Caption := D.Name;
-  Result := 30 + MainFrm.CalcLab.Canvas.TextWidth(D.Name);
+  //Setze die "Caption":
+  If D.VSink = True then
+    S := VSinkStr Else
+    S := '';
+  case D.Typ of
+    PDT_Speaker: S := S+'Speaker';
+    PDT_Player: if (S <> '') and (S <> VSinkStr) then
+                  S := S + ' / Player' Else
+                  S := S + 'Player';
+    PDT_Recorder: if (S <> '') and (S <> VSinkStr) then
+                    S := S + ' / Rec' Else
+                    S := S +'Rec';
+    PDT_Microfone, PDT_Monitor: begin
+                                  if PDT_Monitor and D.Typ <> 0 then
+                                    T := 'Monitor' Else
+                                    T := 'Mic';
+                                  if (S <> '') and (S <> VSinkStr) then
+                                    S := S + ' / '+T Else
+                                    S := S + T;
+                                end;
+    end;
+  FSecCaption := '';
+  If D.Volume <> '' then
+    V := ' ['+D.Volume+'%] ' Else
+    V := '';
   if (D.Typ = PDT_Loop) then
-    Result := 70 Else
-  if (Result < 135) or (D.Typ = PDT_Monitor) then
-    Result := 135;
+    FMainCaption := 'LOOP' Else
+  if (D.Typ = PDT_Monitor) then
+    FMainCaption := S+V Else
+    begin
+      FMainCaption := S+V+':';
+      FSecCaption := D.Name;
+    end;
+end;
+
+function TDevice.GetWidth: Integer;
+var
+  L1, L2: Integer;
+begin
+  if FMainCaption = '' then
+    FSetCaption;
+  MainFrm.CalcLab.Caption := FMainCaption;
+  L1 := 25 + MainFrm.CalcLab.Canvas.TextWidth(FMainCaption);
+  MainFrm.CalcLab.Caption := FSecCaption;
+  L2 := 25 + MainFrm.CalcLab.Canvas.TextWidth(FSecCaption);
+  MainFrm.CalcLab.Caption := '';
+  If L1 > L2 then
+    L2 := L1;
+  Result := L2;
   FWidth := Result;
 end;
 
 function TDevice.GetHeight: Integer;
-begin
-  if (D.Typ = PDT_Loop) or (D.Typ = PDT_Monitor) then
-    Result := 25 Else
-    Result := 40;
+var
+  H1, H2: Integer;
+begin            
+  if FMainCaption = '' then
+    FSetCaption;
+  MainFrm.CalcLab.Caption := FMainCaption;
+  H1 := MainFrm.CalcLab.Canvas.TextHeight(FMainCaption);
+  MainFrm.CalcLab.Caption := FSecCaption;
+  H2 := MainFrm.CalcLab.Canvas.TextHeight(FSecCaption);
+  If H1 > H2 then
+    H2 := H1;
+  FTextHeight := H2;
+  if FSecCaption = '' then
+    Result := FTextHeight+6 Else
+    Result := (FTextHeight*2) +6;
   FHeight := Result;
-end;
-
-procedure TDevice.Save(var Ini: TIniFile);
-begin
-  //Ini.WriteString(FName,'PulseName',FPulseName);
-  //Ini.WriteInteger(FName,'Volume',FVolume);
-end;
-
-procedure TDevice.Load(Ini: TIniFile; AName: String);
-begin
-  //Name := AName;   
-  //PulseName := Ini.ReadString(FName,'PulseName','');
-  //Volume := Ini.ReadInteger(FName,'Volume',100);
 end;
 
 { TMainFRM }
