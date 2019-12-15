@@ -9,8 +9,7 @@ Screenshoot:
 ![Alt text](Screenshoot.png?raw=true "Screenshoot")
 
 Features:
-- Use cables to connect players, speakers, microphones, etc.
-- Use the scrollwheel of your mouse to change the volume of a device
+- Use cables to connect players, speakers, microphones, loops and monitors.
 - Add and manage loops and virtual sinks
 - Save and load configs
 - Change the default speaker and mic via menu
@@ -19,6 +18,18 @@ Installation:
 - Download the i386 or x64 version of this tool for your PC
 - Make sure pulse is installed on your PC
 - Mark the the binary as executeable
+
+Basic usage:
+- Start the program, you should see your audio devices as elements on the field
+- You can do all Actions with your mouse only
+- Left mouseklick:
+    - Connect a device with another one, incompatible devices will be marked in red
+    - The connection is made via "Drag'n'Drop"
+- Middle mousclick:
+    - Mutes / Unmutes a device (is shown in gray)
+- Right mouseclick:
+    - if the device is virtual (loop or virtual sink) a popup menu will show up and you can delete the device.
+- Other options (Save... / Load... / Default (Speaker / Mic) are in the menu at the top of the program)
 
 How to compile:
 - Download and install CodeTyphon from https://www.pilotlogic.com/sitejoom/

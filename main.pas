@@ -40,6 +40,7 @@ type
     PlayingOn: String;
     RecordingFrom: String;
     Volume: String;
+    Vol_Muted: Boolean;
   end;
 
 type
@@ -110,7 +111,8 @@ type
       function CheckSelectedDevice(AID: Integer; Mouse: TPoint): Boolean;
       procedure Repaint;
       procedure LoadFromPulse;
-      procedure LoadFromFile(AFileName: String);
+      procedure LoadFromFile(AFileName: String);    
+      procedure SetMute(AID: Integer; Mute: Boolean);
       procedure SetVol(AID: Integer; AVol: Integer);
       //Cabel-Mngt:
       procedure InitCableMove(P: TPoint);
@@ -203,7 +205,9 @@ var
 begin
   LstResult.Clear;
   AProcess := TProcess.Create(nil);
-  AProcess.CommandLine := Acmd;
+  AProcess.Executable := '/bin/sh';
+  AProcess.Parameters.Add('-c');
+  AProcess.Parameters.Add('export LC_ALL=C && '+Acmd +' && unset LC_ALL');
   AProcess.Options := [poUsePipes];
   AProcess.Execute;
   OutputStream := TMemoryStream.Create;
@@ -278,7 +282,7 @@ begin
   SetLength(PD,0);
   SL := tStringList.Create;
   try
-    //Get Default Devices:     
+    //Get Default Devices:
     GetProcess('pacmd stat',SL);
     DefaultSink := '';
     DefaultMic := '';
@@ -326,6 +330,8 @@ begin
                         end;
                   end;
                 ND.Ident := ND.Device_Name;
+                if Pos('Mute: ',SL[I]) > 0 then
+                  ND.Vol_Muted := CopyFromPos(SL[I],'Mute: ') = 'yes';
                 If Pos('Sink: ',SL[I]) > 0 then
                   ND.PlayingOn := CopyFromPos(SL[I],'Sink: ');
                 If Pos('Source: ',SL[I]) > 0 then
@@ -880,6 +886,7 @@ begin
                 AD[I].Loop_Out := Ini.ReadString(Main,IntToStr(I)+'_Loop_Out','');
                 AD[I].Volume := Ini.ReadString(Main,IntToStr(I)+'_Volume','');
                 AD[I].VSink := Ini.ReadBool(Main,IntToStr(I)+'_VSink',False);
+                AD[I].Vol_Muted := Ini.ReadBool(Main,IntToStr(I)+'_VolMute',False);
               end;              
             //Lösche Virtuelle  Devices:
             RunCMD('pactl unload-module module-loopback');
@@ -917,6 +924,7 @@ begin
                     begin
                       AD[I].ID := PD[J].ID;
                       SetVol(J,StrToIntDef(AD[I].Volume,-1));
+                      SetMute(J,AD[I].Vol_Muted);
                       break;
                     end;
             //Add Cables from Player / Recorder:
@@ -937,6 +945,23 @@ begin
         Ini.Free;
       end;
     end;
+end;
+
+procedure TDeviceMngt.SetMute(AID: Integer; Mute: Boolean);
+var
+  cmdstr: String;
+begin
+  if Mute then
+    cmdstr := ' true' Else
+    cmdstr := ' false';
+  if (PD[AID].Typ = PDT_Player) then
+    RunCmd('pacmd set-sink-input-mute '+PD[AID].ID+cmdstr) Else
+  if (PD[AID].Typ = PDT_Speaker) then
+    RunCmd('pacmd set-sink-mute '+PD[AID].ID+cmdstr) Else
+  if (PD[AID].Typ = PDT_Microfone) or (Dev.PD[AID].Typ = PDT_Monitor) then
+    RunCmd('pacmd set-source-mute '+PD[AID].ID+cmdstr) Else
+  if (PD[AID].Typ = PDT_Recorder) then
+    RunCmd('pacmd set-source-output-mute '+PD[AID].ID+cmdstr);
 end;
 
 procedure TDeviceMngt.SetVol(AID: Integer; AVol: Integer);
@@ -1005,7 +1030,8 @@ begin
               Ini.WriteString(Main,IntToStr(I)+'_Loop_In',PD[I].Loop_In);
               Ini.WriteString(Main,IntToStr(I)+'_Loop_Out',PD[I].Loop_Out);
               Ini.WriteBool(Main,IntToStr(I)+'_VSink',PD[I].VSink);     
-              Ini.WriteString(Main,IntToStr(I)+'_Volume',PD[I].Volume);
+              Ini.WriteString(Main,IntToStr(I)+'_Volume',PD[I].Volume);     
+              Ini.WriteBool(Main,IntToStr(I)+'_VolMute',PD[I].Vol_Muted);
             end;
         Result := True;
       finally
@@ -1273,10 +1299,16 @@ begin
 
     Bitmap.Canvas.Pen.Color := clWhite;
     Bitmap.Canvas.Rectangle(0, 0, FWidth, FHeight);
-
+               
+    Bitmap.Canvas.Font.Color := clBlack;
     if FSelected then
       Col := SelColor Else
-      Col := clBlack;
+    if D.Vol_Muted then
+      begin
+        Col := clGray;          
+        Bitmap.Canvas.Font.Color := clGray;
+      end Else
+        Col := clBlack;
     Bitmap.Canvas.Pen.Color := Col;
     Bitmap.Canvas.Pen.Width := 3;
     if (PDT_Speaker and D.Typ <> 0) or (PDT_Microfone and D.Typ <> 0) or (PDT_Monitor and D.Typ <> 0) then
@@ -1684,6 +1716,19 @@ begin
                    RC_Dev := I;
                    RC.PopUp;
                  end;
+              break;
+            end;
+    end;
+  if mbMiddle = Button then
+    begin
+      P.X := X;
+      P.Y := Y;
+      if Length(Dev.PD) > 0 then
+        for I := 0 to Length(Dev.PD) -1 do
+          if Dev.CheckSelectedDevice(I,P) then
+            begin
+              Dev.SetMute(I,not Dev.PD[I].Vol_Muted);
+              Dev.LoadFromPulse;
               break;
             end;
     end;

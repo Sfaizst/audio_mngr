@@ -310,8 +310,8 @@ object MainFRM: TMainFRM
     VertScrollBar.Page = 336
     VertScrollBar.Tracking = True
     Align = alClient
-    ClientHeight = 494
-    ClientWidth = 533
+    ClientHeight = 496
+    ClientWidth = 535
     Color = clWhite
     ParentColor = False
     TabOrder = 0
