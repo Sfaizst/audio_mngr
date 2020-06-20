@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
-  <Compiler Value="/usr/local/codetyphon/fpc/fpc64/bin/x86_64-linux/fpc" Date="1572270259"/>
+  <Compiler Value="/usr/local/codetyphon/fpc/fpc64/bin/x86_64-linux/fpc" Date="1586225419"/>
   <Params Value=" -Tlinux -MObjFPC -Scghi -CX -Cg -Os1 -Xs -XX -l -vewnhibq -Fi/home/daniel/Dokumente/060_Lazarus-Projekte/000_Neustart-2017-08/Tools/AudioManager/audio_mngr/lib/x86_64-linux -Fl/usr/local/codetyphon/binLibraries/x86_64-linux -Fu/usr/local/codetyphon/typhon/lcl/units/x86_64-linux/gtk2 -Fu/usr/local/codetyphon/typhon/lcl/units/x86_64-linux -Fu/usr/local/codetyphon/typhon/components/BaseUtils/lib/x86_64-linux -Fu/usr/local/codetyphon/typhon/packager/units/x86_64-linux -Fu/home/daniel/Dokumente/060_Lazarus-Projekte/000_Neustart-2017-08/Tools/AudioManager/audio_mngr/ -FU/home/daniel/Dokumente/060_Lazarus-Projekte/000_Neustart-2017-08/Tools/AudioManager/audio_mngr/lib/x86_64-linux/ -FE/home/daniel/Dokumente/060_Lazarus-Projekte/000_Neustart-2017-08/Tools/AudioManager/audio_mngr/bin/ -o/home/daniel/Dokumente/060_Lazarus-Projekte/000_Neustart-2017-08/Tools/AudioManager/audio_mngr/bin/audio_mngr_x86_64-linux -dLCL -dadLCL -dLCLgtk2 audio_mngr.ppr"/>
 </CONFIG>

@@ -1,11 +1,12 @@
 object MainFRM: TMainFRM
   Left = 346
-  Height = 498
+  Height = 488
   Top = 250
-  Width = 537
+  Width = 526
   Caption = 'PulseAudio Cable Manager'
-  ClientHeight = 498
-  ClientWidth = 537
+  ClientHeight = 488
+  ClientWidth = 526
+  DesignTimePPI = 94
   DoubleBuffered = True
   Icon.Data = {
     3E22000000000100010040400000010010003422000016000000280000004000
@@ -290,39 +291,41 @@ object MainFRM: TMainFRM
   OnShow = FormShow
   ParentDoubleBuffered = False
   Position = poScreenCenter
-  LCLVersion = '6.9'
+  LCLVersion = '7.0'
   object CalcLab: TLabel
-    Left = 344
-    Height = 17
-    Top = 400
-    Width = 44
+    Left = 337
+    Height = 21
+    Top = 392
+    Width = 46
     Caption = 'CalcLab'
     ParentColor = False
+    ParentFont = False
     Visible = False
   end
   object SB: TScrollBox
     Left = 0
-    Height = 498
+    Height = 488
     Top = 0
-    Width = 537
+    Width = 526
     HorzScrollBar.Page = 1
     HorzScrollBar.Visible = False
     VertScrollBar.Page = 336
     VertScrollBar.Tracking = True
     Align = alClient
-    ClientHeight = 496
-    ClientWidth = 535
+    ClientHeight = 486
+    ClientWidth = 524
     Color = clWhite
     ParentColor = False
+    ParentFont = False
     TabOrder = 0
     OnMouseDown = SBMouseDown
     OnMouseLeave = SBMouseLeave
     OnMouseUp = SBMouseUp
     object BI: TImage
       Left = 0
-      Height = 90
+      Height = 88
       Top = 0
-      Width = 90
+      Width = 88
       OnMouseDown = SBMouseDown
       OnMouseLeave = SBMouseLeave
       OnMouseMove = PB_NewLineMouseMove
@@ -336,6 +339,7 @@ object MainFRM: TMainFRM
       Top = 0
       Width = 440
       Align = alCustom
+      ParentFont = False
       OnMouseDown = SBMouseDown
       OnMouseLeave = SBMouseLeave
       OnMouseMove = PB_NewLineMouseMove
@@ -345,8 +349,8 @@ object MainFRM: TMainFRM
     end
   end
   object MainMenu: TMainMenu
-    Left = 77
-    Top = 65
+    Left = 75
+    Top = 64
     object M1_File: TMenuItem
       Caption = 'File'
       object M01_Load: TMenuItem
@@ -356,6 +360,30 @@ object MainFRM: TMainFRM
       object M01_SaveAs: TMenuItem
         Caption = 'Save...'
         OnClick = M01_SaveAsClick
+      end
+      object M01_SEP01: TMenuItem
+        Caption = '-'
+      end
+      object M01_LoadRecent: TMenuItem
+        Caption = 'Load recent'
+      end
+      object M01_SEP02: TMenuItem
+        Caption = '-'
+      end
+      object M01_Options: TMenuItem
+        Caption = 'Options...'
+        object M01_OP_DarkM: TMenuItem
+          Caption = 'Dark Mode'
+          OnClick = M01_OP_DarkMClick
+        end
+        object M01_OP_AutoReload: TMenuItem
+          Caption = 'Auto Reload'
+          OnClick = M01_OP_AutoReloadClick
+        end
+        object M01_OP_OnTop: TMenuItem
+          Caption = 'Stay on top'
+          OnClick = M01_OP_OnTopClick
+        end
       end
       object M01_Exit: TMenuItem
         Caption = 'Exit'
@@ -403,11 +431,18 @@ object MainFRM: TMainFRM
     end
   end
   object RC: TPopupMenu
-    Left = 296
-    Top = 212
+    Left = 290
+    Top = 208
     object RC_Del: TMenuItem
       Caption = 'Delete...'
       OnClick = RC_DelClick
     end
+  end
+  object AutoT: TTimer
+    Enabled = False
+    Interval = 100
+    OnTimer = AutoTTimer
+    Left = 274
+    Top = 64
   end
 end
