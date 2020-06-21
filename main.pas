@@ -145,27 +145,16 @@ type
     M02_Dell_All: TMenuItem;
     M3_DefSpeakers: TMenuItem;
     M4_DefMicrofone: TMenuItem;
-    M01_Options: TMenuItem;
-    M01_OP_DarkM: TMenuItem;
-    M01_OP_AutoReload: TMenuItem;
-    M01_OP_OnTop: TMenuItem;
-    M01_SEP01: TMenuItem;
-    M01_SEP02: TMenuItem;
-    M01_LoadRecent: TMenuItem;
     RC_Del: TMenuItem;
     PB_NewLine: TPaintBox;
     RC: TPopupMenu;
     SB: TScrollBox;
-    AutoT: TTimer;
-    procedure AutoTTimer(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormResize(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure M01_ExitClick(Sender: TObject);
     procedure M01_LoadClick(Sender: TObject);
     procedure M01_NewClick(Sender: TObject);
-    procedure M01_OP_AutoReloadClick(Sender: TObject);
-    procedure M01_OP_OnTopClick(Sender: TObject);
     procedure M01_SaveAsClick(Sender: TObject);
     procedure M02_AddLoopClick(Sender: TObject);
     procedure M02_AddVSinkClick(Sender: TObject);
@@ -173,7 +162,6 @@ type
     procedure M02_Del_LoopsClick(Sender: TObject);
     procedure M02_Del_SinksClick(Sender: TObject);
     procedure M5_ReloadClick(Sender: TObject);
-    procedure M01_OP_DarkMClick(Sender: TObject);
     procedure PB_NewLineMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure PB_NewLineMouseWheelDown(Sender: TObject; Shift: TShiftState;
       MousePos: TPoint; var Handled: Boolean);
@@ -186,16 +174,11 @@ type
     procedure SBMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
   private
-    AutoT_Cnt: Byte;
     RC_Dev: Integer;
-    RecentFiles: TStringList;
-    procedure SetDarkMode(IsDark: Boolean);
-    procedure UpdateLoadMenu;
-    procedure AddLoadMenu(AFile: String);
   public
     procedure M3_ItemClick(Sender: TObject);
-    procedure M4_ItemClick(Sender: TObject);   
-    procedure M01_LoadRecentClick(Sender: TObject);
+    procedure M4_ItemClick(Sender: TObject);
+
   end;
 
 type
@@ -206,29 +189,10 @@ var
   Dev: TDeviceMngt;
   D: TDevice;
   AD: TPulseDevice;
-  //ReloadString, ändert er sich, haben sich die Devices geändert:
-  LoadComp: String;
-  //Farben:
-  clLines: TColor;
-  clBackgr: TColor;
 
 implementation
 
-{$R *.frm}
-
-procedure AddMenuItem(AItem: TMenuItem; ACaption: String; const AOnClick: TNotifyEvent = nil);
-var
-  AM: TMenuItem;
-  I: Integer;
-begin
-  AM := TMenuItem.Create(MainFRM.MainMenu);
-  I := AItem.Count;
-  AItem.Add(AM);
-  AM.Caption := ACaption;
-  AM.Tag := I;
-  If AOnClick <> nil then
-    AM.OnClick := AOnClick;
-end;
+{$R *.frm}   
 
 procedure GetProcess(Acmd: String; LstResult:TStringList);
 const
@@ -274,7 +238,7 @@ begin
   end;
 end;
 
-function ReloadPulseDevices(var PD: TPulseDevices; var DefaultSink: String; var DefaultMic: String): Boolean;
+procedure ReloadPulseDevices(var PD: TPulseDevices; var DefaultSink: String; var DefaultMic: String);
   procedure ResetPulseDevice(var AD: TPulseDevice);
     begin
       AD.Ident := '';
@@ -314,7 +278,6 @@ var
   SL: TStringList;
   I, J: Integer;
   ND: TPulseDevice;
-  Comp: String;
 begin
   SetLength(PD,0);
   SL := tStringList.Create;
@@ -331,8 +294,6 @@ begin
           DefaultSink := CopyFromPos(SL[I],'Default sink name: ') Else
         if Pos('Default source name: ',SL[I]) > 0 then
           DefaultMic := CopyFromPos(SL[I],'Default source name: ');
-    Comp := DefaultSink;
-    Comp := Comp + DefaultMic;
     //Get Device Data:
     SL.Clear;
     GetProcess('pactl list',SL);
@@ -348,13 +309,11 @@ begin
             if (Pos('Source Output ',SL[I]) > 0) then
               ND.Typ := PDT_Recorder Else
               ND.Typ := PDT_UnknownDev;
-            Comp := Comp + IntToStr(ND.Typ);
             for J := I to SL.Count -1 do
               begin
                 If Pos('Name: ',SL[I]) > 0 then
                   begin
                     ND.Device_Name := CopyFromPos(SL[I],'Name: ');
-                    Comp := Comp + ND.Device_Name;
                     If Copy(ND.Device_Name,1,6) = 'VSINK_' then
                       ND.VSink := True;
                     If ND.Typ = PDT_UnknownDev then
@@ -371,49 +330,29 @@ begin
                         end;
                   end;
                 ND.Ident := ND.Device_Name;
-                Comp := Comp + ND.Ident;
                 if Pos('Mute: ',SL[I]) > 0 then
-                  begin
-                    ND.Vol_Muted := CopyFromPos(SL[I],'Mute: ') = 'yes';
-                    If ND.Vol_Muted then
-                      Comp := Comp + 'Muted';
-                  end;
+                  ND.Vol_Muted := CopyFromPos(SL[I],'Mute: ') = 'yes';
                 If Pos('Sink: ',SL[I]) > 0 then
-                  begin
-                    ND.PlayingOn := CopyFromPos(SL[I],'Sink: ');
-                    Comp := Comp + ND.PlayingOn;
-                  end;
+                  ND.PlayingOn := CopyFromPos(SL[I],'Sink: ');
                 If Pos('Source: ',SL[I]) > 0 then
-                  begin
-                    ND.RecordingFrom := CopyFromPos(SL[I],'Source: ');     
-                    Comp := Comp + ND.RecordingFrom;
-                  end;
+                  ND.RecordingFrom := CopyFromPos(SL[I],'Source: ');
                 If Pos('device.description = "',SL[I]) > 0 then
                   begin
                     ND.Name := CopyFromPos(SL[I],'device.description = "');
                     If Length(ND.Name) > 0 then
-                      begin
-                        SetLength(ND.Name,Length(ND.Name)-1);
-                        Comp := Comp + ND.Name;
-                      end;
-                  end;
+                      SetLength(ND.Name,Length(ND.Name)-1);
+                  end;        
                 If Pos('application.name = "',SL[I]) > 0 then
                   begin
                     ND.App_Name := CopyFromPos(SL[I],'application.name = "');
                     If Length(ND.App_Name) > 0 then
-                      begin
-                        SetLength(ND.App_Name,Length(ND.App_Name)-1);
-                        Comp := Comp + ND.App_Name;
-                      end;
+                      SetLength(ND.App_Name,Length(ND.App_Name)-1);
                   end;
                 If Pos('media.name = "',SL[I]) > 0 then
                   begin
                     ND.Media_Name := CopyFromPos(SL[I],'media.name = "');
                     If Length(ND.Media_Name) > 0 then
-                      begin
-                        SetLength(ND.Media_Name,Length(ND.Media_Name)-1);
-                        Comp := Comp + ND.Media_Name;
-                      end;
+                      SetLength(ND.Media_Name,Length(ND.Media_Name)-1);
                     If (ND.Typ = PDT_Recorder) and (Copy(ND.Media_Name,1,12)='Loopback to ') then
                       begin
                         ND.Typ := PDT_LoopRec;
@@ -435,24 +374,17 @@ begin
                   begin
                     ND.Prog_Name := CopyFromPos(SL[I],'application.process.binary = "');
                     If Length(ND.Prog_Name) > 0 then
-                      begin
-                        SetLength(ND.Prog_Name,Length(ND.Prog_Name)-1);
-                        Comp := Comp + ND.Prog_Name;
-                      end;
+                      SetLength(ND.Prog_Name,Length(ND.Prog_Name)-1);
                   end;
                 If Pos('Owner Module: ',SL[I]) > 0 then
-                  begin
-                    ND.Module_ID := CopyFromPos(SL[I],'Owner Module: ');
-                    Comp := Comp + ND.Module_ID;
-                  end;
+                  ND.Module_ID := CopyFromPos(SL[I],'Owner Module: ');
                 If (ND.Volume = '') and (
                 (Pos('Volume: front-left: ',SL[I]) > 0) or   
                 (Pos('Volume: mono: ',SL[I]) > 0) or
                 (Pos('Base Volume: ',SL[I]) > 0) ) then
                   begin
                     ND.Volume := CopyFromPos(SL[I],' / ');
-                    ND.Volume := Copy(ND.Volume,1,Pos('%',ND.Volume)-1);   
-                    Comp := Comp + ND.Volume;
+                    ND.Volume := Copy(ND.Volume,1,Pos('%',ND.Volume)-1);
                   end;
                 If ND.Volume <> '' then
                   ND.Volume := StringReplace(ND.Volume,' ','',[rfreplaceall]);
@@ -513,8 +445,6 @@ begin
   finally
     SL.Free;
   end;
-  Result := Comp <> LoadComp;
-  LoadComp := Comp;
 end;     
 
 constructor TDeviceMngt.Create;
@@ -630,6 +560,9 @@ var
   I, J: Integer;
 begin
   SetLength(FCables,0);
+  FImage.Canvas.Clear;
+  FImage.Canvas.Pen.Color := clWhite;
+  FImage.Canvas.Rectangle(0,0,FImage.Width,FImage.Height);
   if Length(Devs) > 0 then
     for I := 0 to Length(Devs) -1 do
       begin
@@ -665,20 +598,10 @@ end;
 procedure TDeviceMngt.FDrawConnections;
 var
   I: Integer;
-  ColoredLine: Boolean;
 begin
   If Length(FCables) > 0 then
-    begin
-      ColoredLine := False;
-      for I := 0 to Length(FCables) -1 do
-        if FCables[I].Color <> clLines then     
-            ColoredLine := true Else
-            FDrawDeviceLines(FCables[I]);
-      If ColoredLine = True then
-        for I := 0 to Length(FCables) -1 do
-          if FCables[I].Color <> clLines then
-            FDrawDeviceLines(FCables[I]);
-    end;
+    for I := 0 to Length(FCables) -1 do
+      FDrawDeviceLines(FCables[I]);
 end;
 
 procedure TDeviceMngt.Repaint;
@@ -839,17 +762,13 @@ begin
       FImage.Width := MainFrm.ClientWidth;
       if MainFrm.ClientHeight-2 < LeftH then
         FImage.Height := LeftH Else
-        FImage.Height := MainFrm.ClientHeight-2;   
-      FImage.Canvas.Brush.Color := clBackgr;
-      FImage.Canvas.FillRect(0, 0, FImage.Width, FImage.Height);
+        FImage.Height := MainFrm.ClientHeight-2;
       MainFRM.BI.Width := FImage.Width;
       MainFRM.BI.Height := FImage.Height;
       MainFRM.BI.Picture.Bitmap.SetSize(FImage.Width, FImage.Height);
       MainFRM.PB_NewLine.Width := FImage.Width;
       MainFRM.PB_NewLine.Height := FImage.Height;    
       FCalcConnections;
-      for I := 0 to Length(FCables) -1 do
-        FCables[I].Color := clLines;    
       //Wenn Device Ausgewählt: Zeichne die Devices in Farbe:
       If (FDeviceSelected > -1) then
         begin
@@ -859,7 +778,9 @@ begin
           Devs[FDeviceSelected].SelColor := clLime;
           Devs[FDeviceSelected].Selected := True;
         end Else
-        begin
+        begin          
+          for I := 0 to Length(FCables) -1 do
+            FCables[I].Color := clBlack;
           for I := 0 to Length(Devs) -1 do
             begin
               Devs[I].Selected := False;
@@ -878,11 +799,23 @@ begin
 end;
 
 procedure TDeviceMngt.LoadFromPulse;
+  procedure AddMenuItem(AItem: TMenuItem; ACaption: String; const AOnClick: TNotifyEvent = nil);
+    var
+      AM: TMenuItem;
+      I: Integer;
+    begin
+      AM := TMenuItem.Create(MainFRM.MainMenu);
+      I := AItem.Count;
+      AItem.Add(AM);
+      AM.Caption := ACaption;
+      AM.Tag := I;
+      If AOnClick <> nil then
+        AM.OnClick := AOnClick;
+    end;
 var
   I: Integer;
-  RedrawMe: Boolean;
 begin
-  RedrawMe := ReloadPulseDevices(PD, FDefaultSink, FDefaultMic);
+  ReloadPulseDevices(PD, FDefaultSink, FDefaultMic);
   if Length(Devs) > 0 then
     begin
       for I := 0 to Length(Devs) -1 do
@@ -893,18 +826,15 @@ begin
   if Length(PD) > 0 then
     begin
       SetLength(Devs,Length(PD));
-      If RedrawMe then
-        begin
-          if MainFrm.M3_DefSpeakers.Count > 0 then
-            for I := MainFrm.M3_DefSpeakers.Count -1 downto 0 do
-              MainFrm.M3_DefSpeakers.Delete(I);
-          if MainFrm.M4_DefMicrofone.Count > 0 then
-            for I := MainFrm.M4_DefMicrofone.Count -1 downto 0 do
-              MainFrm.M4_DefMicrofone.Delete(I);
-        end;
+      if MainFrm.M3_DefSpeakers.Count > 0 then
+        for I := MainFrm.M3_DefSpeakers.Count -1 downto 0 do
+          MainFrm.M3_DefSpeakers.Delete(I);
+      if MainFrm.M4_DefMicrofone.Count > 0 then
+        for I := MainFrm.M4_DefMicrofone.Count -1 downto 0 do
+          MainFrm.M4_DefMicrofone.Delete(I);
       for I := 0 to Length(PD) -1 do
         begin
-          if (RedrawMe) and (PD[I].Typ = PDT_Speaker) then
+          if PD[I].Typ = PDT_Speaker then
             begin
               AddMenuItem(MainFrm.M3_DefSpeakers,PD[I].Name,@MainFrm.M3_ItemClick);
               MainFrm.M3_DefSpeakers.Items[MainFrm.M3_DefSpeakers.Count -1].Tag := I;
@@ -912,7 +842,7 @@ begin
                 MainFrm.M3_DefSpeakers.Items[MainFrm.M3_DefSpeakers.Count -1].Checked := True Else
                 MainFrm.M3_DefSpeakers.Items[MainFrm.M3_DefSpeakers.Count -1].Checked := False;
             end;       
-          if (RedrawMe) and ((PD[I].Typ = PDT_Microfone) or (PD[I].Typ = PDT_Monitor)) then
+          if (PD[I].Typ = PDT_Microfone) or (PD[I].Typ = PDT_Monitor) then
             begin
               AddMenuItem(MainFrm.M4_DefMicrofone,PD[I].Name,@MainFrm.M4_ItemClick);     
               MainFrm.M4_DefMicrofone.Items[MainFrm.M4_DefMicrofone.Count -1].Tag := I;
@@ -922,8 +852,7 @@ begin
             end;
           Devs[I] := TDevice.Create(PD[I]);
         end;
-      If RedrawMe then
-        Repaint;
+      Repaint;
     end;
 end;
 
@@ -984,7 +913,7 @@ begin
                         T := PD[J].ID;
                         break;
                       end;
-                  RunCMD('pactl load-module module-loopback source='+S+' sink='+T+' latency_msec=10');
+                  RunCMD('pactl load-module module-loopback source='+S+' sink='+T+' latency_msec=1');
                 end;
             //Link Devices [Mic, Monitor, Rec, Player]:
             if Length(PD) > 0 then
@@ -1368,13 +1297,10 @@ begin
     Bitmap.Height := FHeight;
     Bitmap.Width := FWidth;
 
-    Bitmap.Canvas.Brush.Color := clBackgr;
-    Bitmap.Canvas.FillRect(0,0,FWidth, FHeight);
-
-    //Bitmap.Canvas.Pen.Color := clLines;
-    //Bitmap.Canvas.Rectangle(0, 0, FWidth, FHeight);
+    Bitmap.Canvas.Pen.Color := clWhite;
+    Bitmap.Canvas.Rectangle(0, 0, FWidth, FHeight);
                
-    Bitmap.Canvas.Font.Color := clLines;
+    Bitmap.Canvas.Font.Color := clBlack;
     if FSelected then
       Col := SelColor Else
     if D.Vol_Muted then
@@ -1382,7 +1308,7 @@ begin
         Col := clGray;          
         Bitmap.Canvas.Font.Color := clGray;
       end Else
-        Col := clLines;
+        Col := clBlack;
     Bitmap.Canvas.Pen.Color := Col;
     Bitmap.Canvas.Pen.Width := 3;
     if (PDT_Speaker and D.Typ <> 0) or (PDT_Microfone and D.Typ <> 0) or (PDT_Monitor and D.Typ <> 0) then
@@ -1403,7 +1329,9 @@ begin
     //Ausgangspfeil (offen) Rechts / Oben (Audioausgabe / Player):
     if (PDT_Player and D.Typ <> 0) or (PDT_Loop and D.Typ <> 0) then
       begin
+        Bitmap.Canvas.Pen.Color := clWhite;
         Bitmap.Canvas.Line(Fwidth -11,4,Fwidth -11,10);
+        Bitmap.Canvas.Pen.Color := Col;
         Bitmap.Canvas.Line(Fwidth -10,1,Fwidth,6);
         Bitmap.Canvas.Line(Fwidth -10,11,Fwidth,6);
       end;
@@ -1540,10 +1468,7 @@ begin
   try
     OD.Filter := 'Audio-Config|*.pacm';
     If (OD.Execute) and (OD.FileName <> '') then
-      begin
-        AddLoadMenu(OD.FileName);
-        Dev.LoadFromFile(OD.FileName);
-      end;
+      Dev.LoadFromFile(OD.FileName);
   finally
     OD.Free;
   end;
@@ -1585,178 +1510,20 @@ begin
 end;
 
 procedure TMainFRM.FormClose(Sender: TObject; var CloseAction: TCloseAction);
-const
-  Ini_Main = 'Main';    
-  Ini_File = 'Files';
-var
-  Ini: TIniFile;
-  I: Byte;
 begin
   if (Dev <> nil) and Assigned(Dev) then
     Dev.Free;
-  Ini := TIniFile.Create(GetAppConfigFile(False));
-  try
-    Ini.WriteBool(Ini_Main,'Maximized',WindowState = wsMaximized);
-    If MainFrm.WindowState = wsMaximized then
-      WindowState := wsNormal;
-    Ini.WriteInteger(Ini_Main,'XPos',MainFrm.Left);
-    Ini.WriteInteger(Ini_Main,'YPos',MainFrm.Top);
-    Ini.WriteInteger(Ini_Main,'Width',MainFrm.Width);
-    Ini.WriteInteger(Ini_Main,'Height',MainFrm.Height);
-    Ini.WriteBool(Ini_Main,'DarkMode',M01_OP_DarkM.Checked);
-    Ini.WriteBool(Ini_Main,'AutoReload',M01_OP_AutoReload.Checked);
-    Ini.WriteBool(Ini_Main,'OnTop',M01_OP_OnTop.Checked);
-    Ini.WriteInteger(Ini_File,'Count',RecentFiles.Count);
-    If RecentFiles.Count > 0 then
-      for I := 0 to RecentFiles.Count -1 do
-        Ini.WriteString(Ini_File,IntToStr(I)+'_File',RecentFiles[I]);
-  finally
-    Ini.Free;
-  end;
-  RecentFiles.Free;
-end;
-
-procedure TMainFRM.AutoTTimer(Sender: TObject);
-begin
-  If AutoT_Cnt >= 10 then
-    begin
-      Dev.LoadFromPulse;
-      SBMouseDown(Sender,mbLeft,[ssShift],0,0);
-      SBMouseUp(Sender,mbLeft,[ssShift],0,0);
-      AutoT_Cnt := 0;
-    end Else
-  Inc(AutoT_Cnt);
-end;
-
-function AppName: String;
-begin
-  Result:= 'PA_CableManager';
 end;
 
 procedure TMainFRM.FormShow(Sender: TObject);
-const
-  Ini_Main = 'Main';
-  Ini_File = 'Files';
-var
-  Ini: TIniFile;
-  S: String;
-  FCnt, I: Byte;
 begin
-  RecentFiles := TStringList.Create;
-  OnGetApplicationName := @AppName;
-  Ini := TIniFile.Create(GetAppConfigFile(False));
-  try
-    MainFrm.Left := Ini.ReadInteger(Ini_Main,'XPos',MainFrm.Left);
-    MainFrm.Top := Ini.ReadInteger(Ini_Main,'YPos',MainFrm.Top);
-    MainFrm.Width := Ini.ReadInteger(Ini_Main,'Width',MainFrm.Width);
-    MainFrm.Height := Ini.ReadInteger(Ini_Main,'Height',MainFrm.Height);
-    If Ini.ReadBool(Ini_Main,'Maximized',False) then
-      MainFrm.WindowState := wsMaximized;
-    M01_OP_DarkM.Checked := Ini.ReadBool(Ini_Main,'DarkMode',False);     
-    SetDarkMode(M01_OP_DarkM.Checked);
-    M01_OP_AutoReload.Checked := Ini.ReadBool(Ini_Main,'AutoReload',False);   
-    AutoT_Cnt := 0;
-    AutoT.Enabled := M01_OP_AutoReload.Checked;
-    M5_Reload.Visible := not M01_OP_AutoReload.Checked;
-    M01_OP_OnTop.Checked := Ini.ReadBool(Ini_Main,'OnTop',False);      
-    If M01_OP_OnTop.Checked then
-      FormStyle:=fsSystemStayOnTop Else
-      FormStyle:=fsNormal;
-    FCnt := Ini.ReadInteger(Ini_File,'Count',0);
-    If FCnt > 0 then
-      for I := 0 to FCnt -1 do
-        begin
-          S := Ini.ReadString(Ini_File,IntToStr(I)+'_File','');
-          If (S <> '') and (FileExists(S)) then
-            RecentFiles.Add(S);
-        end;
-    UpdateLoadMenu;
-  finally
-    Ini.Free;
-  end;
   Dev := TDeviceMngt.Create;
   Dev.LoadFromPulse;
-end;
-
-procedure TMainFRM.UpdateLoadMenu;
-var
-  I: Byte;
-begin
-  If M01_LoadRecent.Count > 0 then
-    for I := MainFrm.M01_LoadRecent.Count -1 downto 0 do
-      MainFrm.M01_LoadRecent.Delete(I);
-  if RecentFiles.Count > 0 then
-    for I := 0 to RecentFiles.Count -1 do
-      AddMenuItem(M01_LoadRecent,ExtractFileName(RecentFiles[I]),@M01_LoadRecentClick);
-end;
-
-procedure TMainFRM.AddLoadMenu(AFile: String);
-var
-  I: Byte;
-begin
-  If (AFile <> '') and (FileExists(AFile)) then
-    begin
-      RecentFiles.Insert(0,AFile);
-      if RecentFiles.Count > 1 then
-        for I := 1 to RecentFiles.Count -1 do
-          if ExtractFileName(AFile) = ExtractFileName(RecentFiles[I]) then
-            begin
-              RecentFiles.Delete(I);
-              break;
-            end;
-      if RecentFiles.Count > 5 then
-        repeat
-          RecentFiles.Delete(RecentFiles.Count -1);
-        until RecentFiles.Count <= 5;
-      UpdateLoadMenu;
-    end;
-end;
-
-procedure TMainFRM.M01_LoadRecentClick(Sender: TObject);
-var
-  I: Byte;
-begin
-  If (RecentFiles.Count > 0) and ((Sender As TMenuItem).Caption <> '') then
-    for I := 0 to RecentFiles.Count -1 do
-      If ((Sender As TMenuItem).Caption = ExtractFileName(RecentFiles[I])) and (FileExists(RecentFiles[I])) then
-        begin
-          Dev.LoadFromFile(RecentFiles[I]);
-          break;
-        end;
-end;
-
-procedure TMainFRM.SetDarkMode(IsDark: Boolean);
-begin
-  if IsDark then
-    begin
-      clLines := clWhite;
-      clBackgr := clBlack;
-    end Else
-    begin
-      clLines := clBlack;
-      clBackgr := clWhite;
-    end;
 end;
 
 procedure TMainFRM.M01_NewClick(Sender: TObject);
 begin
 
-end;
-
-procedure TMainFRM.M01_OP_AutoReloadClick(Sender: TObject);
-begin
-  M01_OP_AutoReload.Checked := not M01_OP_AutoReload.Checked;
-  AutoT_Cnt := 0;
-  AutoT.Enabled := M01_OP_AutoReload.Checked;
-  M5_Reload.Visible := not M01_OP_AutoReload.Checked;
-end;
-
-procedure TMainFRM.M01_OP_OnTopClick(Sender: TObject);
-begin
-  M01_OP_OnTop.Checked := not M01_OP_OnTop.Checked;
-  If M01_OP_OnTop.Checked then
-    FormStyle:=fsSystemStayOnTop Else
-    FormStyle:=fsNormal;
 end;
 
 procedure TMainFRM.M01_SaveAsClick(Sender: TObject);
@@ -1775,10 +1542,7 @@ begin
         If AnsiLowerCase(ExtractFileExt(SL.FileName)) <> '.pacm' then
           S := S + '.pacm';
         If Dev.SaveToFile(S) then
-          begin
-            AddLoadMenu(S);
-            ShowMessage('Settings saved.');
-          end else
+          ShowMessage('Settings saved.') Else
           ShowMessage('Settings could not be saved.')
       end;
   finally
@@ -1788,7 +1552,7 @@ end;
 
 procedure TMainFRM.M02_AddLoopClick(Sender: TObject);
 begin
-  RunCMD('pactl load-module module-loopback latency_msec=10');
+  RunCMD('pactl load-module module-loopback latency_msec=1');
   Dev.LoadFromPulse;
 end;
 
@@ -1844,13 +1608,6 @@ begin
   //Clipboard.AsText := RunCMD('pactl list');
 end;
 
-procedure TMainFRM.M01_OP_DarkMClick(Sender: TObject);
-begin
-  M01_OP_DarkM.Checked := not M01_OP_DarkM.Checked;
-  SetDarkMode(M01_OP_DarkM.Checked);
-  Dev.Repaint;
-end;
-
 procedure TMainFRM.RC_DelClick(Sender: TObject);
 begin
   RunCMD('pactl unload-module '+Dev.PD[RC_Dev].Module_ID);
@@ -1862,11 +1619,6 @@ procedure TMainFRM.SBMouseDown(Sender: TObject; Button: TMouseButton;
 var
   P: TPoint;
 begin
-  if M01_OP_AutoReload.Checked then
-    begin
-      AutoT_Cnt := 0;
-      AutoT.Enabled := False;
-    end;
   if mbLeft = Button then
     begin
       P.X := X;
@@ -1935,12 +1687,7 @@ var
 begin
   P.X := 0;
   P.Y := 0;
-  Dev.EndCableMove(P);   
-  if M01_OP_AutoReload.Checked then
-    begin
-      AutoT_Cnt := 0;
-      AutoT.Enabled := True;
-    end;
+  Dev.EndCableMove(P);
 end;
 
 procedure TMainFRM.SBMouseUp(Sender: TObject; Button: TMouseButton;
@@ -1984,12 +1731,8 @@ begin
               Dev.LoadFromPulse;
               break;
             end;
-    end;  
-  if M01_OP_AutoReload.Checked then
-    begin
-      AutoT_Cnt := 0;
-      AutoT.Enabled := True;
     end;
 end;
 
 end.
+

@@ -10,7 +10,7 @@
         <IsPartOfProject Value="True"/>
         <IsVisibleTab Value="True"/>
         <EditorIndex Value="1"/>
-        <CursorPos X="3" Y="9"/>
+        <CursorPos X="55" Y="19"/>
         <UsageCount Value="216"/>
         <Loaded Value="True"/>
       </Unit>
@@ -21,8 +21,9 @@
         <ComponentName Value="MainFRM"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
-        <TopLine Value="1683"/>
-        <CursorPos X="86" Y="1690"/>
+        <IsVisibleTab Value="True"/>
+        <TopLine Value="1688"/>
+        <CursorPos X="54" Y="1693"/>
         <UsageCount Value="216"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
@@ -33,16 +34,16 @@
         <EditorIndex Value="4"/>
         <TopLine Value="654"/>
         <CursorPos X="3" Y="666"/>
-        <UsageCount Value="107"/>
+        <UsageCount Value="86"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
         <Filename Value="/usr/local/codetyphon/fpcsrc/rtl/objpas/classes/classesh.inc"/>
         <FRMtype Value="0"/>
         <EditorIndex Value="3"/>
-        <TopLine Value="90"/>
-        <CursorPos X="29" Y="101"/>
-        <UsageCount Value="107"/>
+        <TopLine Value="11"/>
+        <CursorPos X="23" Y="27"/>
+        <UsageCount Value="86"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -52,7 +53,7 @@
         <EditorIndex Value="2"/>
         <TopLine Value="179"/>
         <CursorPos X="27" Y="197"/>
-        <UsageCount Value="107"/>
+        <UsageCount Value="86"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -61,7 +62,23 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="190"/>
         <CursorPos X="23" Y="206"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="10"/>
+      </Unit>
+      <Unit>
+        <Filename Value="/usr/local/codetyphon/typhon/lcl/include/control.inc"/>
+        <FRMtype Value="0"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="4282"/>
+        <CursorPos Y="4300"/>
+        <UsageCount Value="1"/>
+      </Unit>
+      <Unit>
+        <Filename Value="/usr/local/codetyphon/typhon/lcl/include/wincontrol.inc"/>
+        <FRMtype Value="0"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="4338"/>
+        <CursorPos Y="4355"/>
+        <UsageCount Value="1"/>
       </Unit>
       <Unit>
         <Filename Value="/usr/local/codetyphon/fpcsrc/rtl/inc/typshrdh.inc"/>
@@ -69,7 +86,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="52"/>
         <CursorPos X="3" Y="62"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="2"/>
       </Unit>
       <Unit>
         <Filename Value="/usr/local/codetyphon/typhon/lcl/include/menuitem.inc"/>
@@ -77,14 +94,114 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="149"/>
         <CursorPos Y="167"/>
-        <UsageCount Value="3"/>
+        <UsageCount Value="8"/>
       </Unit>
     </Units>
-    <JumpHistory Count="1">
-      <Position1>
+    <JumpHistory HistoryIndex="25">
+      <Position>
         <Filename Value="main.pas"/>
-        <Caret Line="1690" Column="86" TopLine="1683"/>
-      </Position1>
+        <Caret Line="828" Column="37" TopLine="801"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="840" Column="23" TopLine="820"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="104" Column="33" TopLine="104"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="658" Column="11" TopLine="636"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="660" Column="9" TopLine="633"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="32" Column="58" TopLine="16"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1672" Column="3" TopLine="1658"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="188" Column="5" TopLine="177"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1585" Column="11" TopLine="1585"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1586" Column="11" TopLine="1586"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1587" Column="11" TopLine="1587"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1588" Column="11" TopLine="1588"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1589" Column="11" TopLine="1589"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1590" Column="11" TopLine="1590"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1591" Column="11" TopLine="1591"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="197" Column="15" TopLine="197"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="196" Column="15" TopLine="196"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="195" Column="15" TopLine="195"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="194" Column="15" TopLine="194"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="193" Column="29" TopLine="168"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="197" Column="34" TopLine="190"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1544" Column="44" TopLine="1532"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1721" Column="46" TopLine="1700"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1690" Column="67" TopLine="1672"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1717" Column="11" TopLine="1700"/>
+      </Position>
+      <Position>
+        <Filename Value="main.pas"/>
+        <Caret Line="1721" Column="11" TopLine="1703"/>
+      </Position>
     </JumpHistory>
     <RunParams>
       <FormatVersion Value="2"/>
