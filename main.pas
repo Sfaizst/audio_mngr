@@ -870,7 +870,14 @@ begin
       FDrawConnections;
       //Zeichne die Devices:
       for I := 0 to Length(Devs) -1 do
-        Devs[I].Paint;
+        if (Devs[I].D.Vol_Muted) then
+          Devs[I].Paint;
+      for I := 0 to Length(Devs) -1 do
+        if (not Devs[I].D.Vol_Muted) and (not Devs[I].Selected) then
+          Devs[I].Paint;
+      for I := 0 to Length(Devs) -1 do
+        if (not Devs[I].D.Vol_Muted) and (Devs[I].Selected) then
+          Devs[I].Paint;
       MainFRM.BI.Picture.Bitmap.Assign(FImage); //Oder: MainFRM.BI.Canvas.Draw(0,0,FImage);
       MainFrm.Update;
     end;

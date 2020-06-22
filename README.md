@@ -5,14 +5,22 @@ I used it just for me and my problems with pulse...
 
 The writing and code style is lazy and probably buggy, please do not take this codestyle as an inspiration.
 
-Screenshoot:
+Basic Usage [Screenshoot]:
 ![Alt text](Screenshoot.png?raw=true "Screenshoot")
+
+Dark Mode [Screenshoot]:
+![Alt text](Screenshoot_DarkMode.png?raw=true "Screenshoot")
 
 Features:
 - Use cables to connect players, speakers, microphones, loops and monitors.
 - Add and manage loops and virtual sinks
 - Save and load configs
 - Change the default speaker and mic via menu
+
+Settings (via "File" --> "Options"):
+- Dark Mode (more eye-friendly)
+- Automatic reload of devices / programs if a change happends (seems to be stable so far)
+- Option for always stay on top above all other programs
 
 Installation:
 - Download the i386 or x64 version of this tool for your PC
@@ -21,14 +29,14 @@ Installation:
 
 Basic usage:
 - Start the program, you should see your audio devices as elements on the field
-- You can do all Actions with your mouse only
+- Every interaction with the program is with the mouse only:
 - Left mouseklick:
     - Connect a device with another one, incompatible devices will be marked in red
     - The connection is made via "Drag'n'Drop"
 - Middle mousclick:
     - Mutes / Unmutes a device (is shown in gray)
 - Right mouseclick:
-    - if the device is virtual (loop or virtual sink) a popup menu will show up and you can delete the device.
+    - if the device is virtual (loop or virtual sink) a popup menu will show up, so that you can delete the device.
 - Other options (Save... / Load... / Default (Speaker / Mic) are in the menu at the top of the program)
 
 How to compile:
@@ -41,7 +49,7 @@ Known problems:
 - If a Program / Name is used mutible times the program can't tell the difference when loading from config
 - The program was written with the german (UTF8) charset in mind and isn't in any way directly connected to pulse
   all actions / readings from pulse are executed via (bash) commands in the background it may be possible that it's not 
-  working very well with other charsets
+  working very well with other charsets (this should be fixed since V0.5)
 
 Requirements:
 - Installed Pulse Audio server and at most the command pactl, test with "pactl -h"

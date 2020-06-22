@@ -16,6 +16,7 @@
     <VersionInfo>
       <UseVersionInfo Value="True"/>
       <MinorVersionNr Value="6"/>
+      <RevisionNr Value="1"/>
     </VersionInfo>
     <BuildModes>
       <Item Name="Default" Default="True"/>
@@ -26,12 +27,11 @@
     </PublishOptions>
     <RunParams>
       <FormatVersion Value="2"/>
-      <Modes Count="0"/>
     </RunParams>
-    <RequiredPackages Count="1">
-      <Item1>
+    <RequiredPackages>
+      <Item>
         <PackageName Value="adLCL"/>
-      </Item1>
+      </Item>
     </RequiredPackages>
     <Units>
       <Unit>
@@ -72,20 +72,4 @@
       <LinkSmart Value="True"/>
     </Linking>
   </CompilerOptions>
-<<<<<<< HEAD
-=======
-  <Debugging>
-    <Exceptions>
-      <Item>
-        <Name Value="EAbort"/>
-      </Item>
-      <Item>
-        <Name Value="ECodetoolError"/>
-      </Item>
-      <Item>
-        <Name Value="EFOpenError"/>
-      </Item>
-    </Exceptions>
-  </Debugging>
->>>>>>> master
 </CONFIG>
