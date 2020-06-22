@@ -72,4 +72,20 @@
       <LinkSmart Value="True"/>
     </Linking>
   </CompilerOptions>
+<<<<<<< HEAD
+=======
+  <Debugging>
+    <Exceptions>
+      <Item>
+        <Name Value="EAbort"/>
+      </Item>
+      <Item>
+        <Name Value="ECodetoolError"/>
+      </Item>
+      <Item>
+        <Name Value="EFOpenError"/>
+      </Item>
+    </Exceptions>
+  </Debugging>
+>>>>>>> master
 </CONFIG>
