@@ -44,6 +44,21 @@ type
   end;
 
 type
+  TPulseProp = record
+    Name: String; //Gut Lesbarer Name
+    PulseName: String; //Pulse DeviceName
+    Avail: Boolean;
+  end;
+
+type
+  TPulseCard = record
+    Name: String;
+    PulseName: String;
+    Props: Array of TPulseProp;
+    CurrentProp: Int16; //= Array Element
+  end;
+
+type
   TCable = record
     Input: Integer;
     Output: Integer;
@@ -55,6 +70,7 @@ type
   end;
 
 type TPulseDevices = Array of TPulseDevice;
+type TPulseCards = Array of TPulseCard;
 
 type
   TDevice = class
@@ -104,13 +120,14 @@ type
       procedure FDrawConnections;
     public
       Devs: Array of TDevice;
-      PD: TPulseDevices;    
+      PD: TPulseDevices;
+      PC: TPulseCards;
       property DefaultSink: String read FDefaultSink;
       property DefaultMic: String read FDefaultMic;
       constructor Create;
       function CheckSelectedDevice(AID: Integer; Mouse: TPoint): Boolean;
       procedure Repaint;
-      procedure LoadFromPulse;
+      procedure LoadFromPulse(const ForceFullReload: Boolean = False);
       procedure LoadFromFile(AFileName: String);    
       procedure SetMute(AID: Integer; Mute: Boolean);
       procedure SetVol(AID: Integer; AVol: Integer);
@@ -134,7 +151,7 @@ type
     M01_Load: TMenuItem;
     M01_SaveAs: TMenuItem;
     M01_Exit: TMenuItem;
-    M5_Reload: TMenuItem;
+    M6_Reload: TMenuItem;
     M2_Devices: TMenuItem;
     M02_AddLoop: TMenuItem;
     M02_AddVSink: TMenuItem;
@@ -152,6 +169,8 @@ type
     M01_SEP01: TMenuItem;
     M01_SEP02: TMenuItem;
     M01_LoadRecent: TMenuItem;
+    M5_CardConfig: TMenuItem;
+    M01_OP_HideCards: TMenuItem;
     RC_Del: TMenuItem;
     PB_NewLine: TPaintBox;
     RC: TPopupMenu;
@@ -163,8 +182,8 @@ type
     procedure FormShow(Sender: TObject);
     procedure M01_ExitClick(Sender: TObject);
     procedure M01_LoadClick(Sender: TObject);
-    procedure M01_NewClick(Sender: TObject);
     procedure M01_OP_AutoReloadClick(Sender: TObject);
+    procedure M01_OP_HideCardsClick(Sender: TObject);
     procedure M01_OP_OnTopClick(Sender: TObject);
     procedure M01_SaveAsClick(Sender: TObject);
     procedure M02_AddLoopClick(Sender: TObject);
@@ -172,7 +191,7 @@ type
     procedure M02_Dell_AllClick(Sender: TObject);
     procedure M02_Del_LoopsClick(Sender: TObject);
     procedure M02_Del_SinksClick(Sender: TObject);
-    procedure M5_ReloadClick(Sender: TObject);
+    procedure M6_ReloadClick(Sender: TObject);
     procedure M01_OP_DarkMClick(Sender: TObject);
     procedure PB_NewLineMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure PB_NewLineMouseWheelDown(Sender: TObject; Shift: TShiftState;
@@ -194,7 +213,8 @@ type
     procedure AddLoadMenu(AFile: String);
   public
     procedure M3_ItemClick(Sender: TObject);
-    procedure M4_ItemClick(Sender: TObject);   
+    procedure M4_ItemClick(Sender: TObject);
+    procedure M5_ItemClick(Sender: TObject);
     procedure M01_LoadRecentClick(Sender: TObject);
   end;
 
@@ -274,7 +294,7 @@ begin
   end;
 end;
 
-function ReloadPulseDevices(var PD: TPulseDevices; var DefaultSink: String; var DefaultMic: String): Boolean;
+function ReloadPulseDevices(var PD: TPulseDevices; var PC: TPulseCards; var DefaultSink: String; var DefaultMic: String): Boolean;
   procedure ResetPulseDevice(var AD: TPulseDevice);
     begin
       AD.Ident := '';
@@ -290,12 +310,21 @@ function ReloadPulseDevices(var PD: TPulseDevices; var DefaultSink: String; var 
       AD.Volume := '';
       AD.Typ := PDT_NULL;
     end;
-  function CopyFromPos(Source: String; const FromStr: String): String;
+  procedure ResetPulseCard(var AC: TPulseCard);
+    begin
+      AC.Name := '';    
+      AC.PulseName := '';
+      SetLength(AC.Props,0);
+      AC.CurrentProp := -1;
+    end;
+  function CopyFromPos(Source: String; const FromStr: String; const ToStr: String = ''): String;
     var
       I: Integer;
     begin
       I := Pos(FromStr,Source)+Length(FromStr);
-      Result := Copy(Source,I,Length(Source)-I+1);
+      If ToStr = '' then
+        Result := Copy(Source,I,Length(Source)-I+1) Else
+        Result := Copy(Source,I,Pos(ToStr, Source,I+2)-I);
     end;
   function IsADevice(StrToCheck: String): Boolean;
     begin
@@ -309,14 +338,24 @@ function ReloadPulseDevices(var PD: TPulseDevices; var DefaultSink: String; var 
       if (Pos('#',StrToCheck) > 0) and (
          (Pos('Source ',StrToCheck) > 0) or (Pos('Sink ',StrToCheck) > 0)) then
            Result := True;
+    end;       
+  function IsNewCard(StrToCheck: String): Boolean;
+    begin
+      Result := False;
+      if (Pos('#',StrToCheck) > 0) and
+         (Pos('Card ',StrToCheck) > 0) then
+           Result := True;
     end;
 var
   SL: TStringList;
-  I, J: Integer;
+  I, J, K, C: Integer;
   ND: TPulseDevice;
   Comp: String;
+  AStr: String;
+  ProfileSub: Boolean;
 begin
-  SetLength(PD,0);
+  SetLength(PD,0);     
+  SetLength(PC,0);
   SL := tStringList.Create;
   try
     //Get Default Devices:
@@ -339,6 +378,63 @@ begin
     I := 0;
     If SL.Count > 0 then
       repeat
+        if IsNewCard(SL[I]) = True then
+          begin
+            SetLength(PC,Length(PC) +1);
+            C := Length(PC) -1;
+            ResetPulseCard(PC[C]);
+            ProfileSub := False;
+            for J := I to SL.Count -1 do
+              begin
+                if ProfileSub = true then
+                  begin
+                    if Pos('Active Profile: ',SL[I]) > 0 then
+                      begin
+                        AStr := CopyFromPos(SL[I],'Active Profile: ');
+                        if Length(PC[C].Props) > 0 then
+                          for K := 0 to Length(PC[C].Props) -1 do
+                            if AStr = PC[C].Props[K].PulseName then
+                              begin
+                                PC[C].CurrentProp := K;
+                                Comp := Comp + IntToStr(K);
+                                break;
+                              end;
+                        ProfileSub := False;
+                        break;
+                      end Else
+                      begin
+                        SetLength(PC[C].Props,Length(PC[C].Props)+1);
+                        K := Length(PC[C].Props) -1;
+                        PC[C].Props[K].PulseName := CopyFromPos(SL[I],#9#9,': ');
+                        Comp := Comp + PC[C].Props[K].PulseName;
+                        PC[C].Props[K].Name := CopyFromPos(SL[I],PC[C].Props[K].PulseName + ': ',' (sinks:');
+                        PC[C].Props[K].Avail := False;
+                        if (Pos('available: no)',SL[I]) <= 0) and (Pos('available: yes)',SL[I]) > 0) then
+                          begin
+                            PC[C].Props[K].Avail := True;
+                            Comp := Comp + 'T';
+                          end;
+                      end;
+                  end Else
+                if Pos('Name: ',SL[I]) > 0 then
+                  begin
+                    PC[C].PulseName := CopyFromPos(SL[I],'Name: ');
+                    Comp := Comp + PC[C].PulseName;
+                  end Else
+                if Pos('alsa.card_name = ',SL[I]) > 0 then
+                  PC[C].Name := CopyFromPos(SL[I],'alsa.card_name = "','"') Else
+                if Pos('Profiles:', SL[I]) > 0 then
+                  ProfileSub := True;
+                If I < SL.Count -1 then
+                  Inc(I) Else
+                  break;
+                if (IsADevice(SL[I]) = True) or (IsNewCard(SL[I]) = True) then
+                  begin
+                    Dec(I);
+                    break;
+                  end;
+              end;
+          end;
         if IsNewDevice(SL[I]) = True then
           begin
             ResetPulseDevice(ND);
@@ -459,7 +555,7 @@ begin
                 If I < SL.Count -1 then
                   Inc(I) Else
                   break;
-                if IsADevice(SL[I]) = True then
+                if (IsADevice(SL[I]) = True) or (IsNewCard(SL[I]) = True) then
                   begin
                     Dec(I);
                     break;
@@ -884,12 +980,15 @@ begin
   FRepainting := False;
 end;
 
-procedure TDeviceMngt.LoadFromPulse;
+procedure TDeviceMngt.LoadFromPulse(const ForceFullReload: Boolean = False);
 var
-  I: Integer;
+  I, J, L: Integer;
   RedrawMe: Boolean;
+  AM: TMenuItem;
 begin
-  RedrawMe := ReloadPulseDevices(PD, FDefaultSink, FDefaultMic);
+  RedrawMe := ReloadPulseDevices(PD, PC, FDefaultSink, FDefaultMic);
+  If ForceFullReload = True then
+    ReDrawMe := True;
   if Length(Devs) > 0 then
     begin
       for I := 0 to Length(Devs) -1 do
@@ -908,6 +1007,36 @@ begin
           if MainFrm.M4_DefMicrofone.Count > 0 then
             for I := MainFrm.M4_DefMicrofone.Count -1 downto 0 do
               MainFrm.M4_DefMicrofone.Delete(I);
+          if MainFrm.M5_CardConfig.Count > 0 then
+            for I := MainFrm.M5_CardConfig.Count -1 downto 0 do
+              begin
+                if MainFrm.M5_CardConfig.Items[I].Count > 0 then
+                  for J := MainFrm.M5_CardConfig.Items[I].Count -1 downto 0 do
+                    MainFrm.M5_CardConfig.Items[I].Delete(J);
+                MainFrm.M5_CardConfig.Delete(I);
+              end;
+          if Length(PC) > 0 then
+            for I := 0 to Length(PC) -1 do
+              if Length(PC[I].Props) > 0 then
+                begin
+                  AddMenuItem(MainFrm.M5_CardConfig,PC[I].Name,nil);
+                  AM := MainFrm.M5_CardConfig.Items[I];
+                  for J := 0 to Length(PC[I].Props) -1 do
+                    begin
+                      If ((MainFrm.M01_OP_HideCards.Checked = True) and (PC[I].Props[J].Avail = True)) or
+                         (MainFrm.M01_OP_HideCards.Checked = False) then
+                        begin
+                          If (MainFrm.M01_OP_HideCards.Checked = False) and (PC[I].Props[J].Avail = False) then
+                            AddMenuItem(AM,PC[I].Props[J].Name + ' (unused)', @MainFrm.M5_ItemClick) Else
+                            AddMenuItem(AM,PC[I].Props[J].Name, @MainFrm.M5_ItemClick);
+                          L := AM.Count -1;
+                          AM.Items[L].Tag := I * 10000 + J;
+                          If J = PC[I].CurrentProp then
+                            AM.Items[L].Checked := True Else
+                            AM.Items[L].Checked := False;
+                        end;
+                    end;
+                end;
         end;
       for I := 0 to Length(PD) -1 do
         begin
@@ -969,6 +1098,15 @@ begin
             //Lösche Virtuelle  Devices:
             RunCMD('pactl unload-module module-loopback');
             RunCMD('pactl unload-module module-null-sink');
+            //Lade ausgewählte / gespeicherte Kartenauswahl:
+            J := Ini.ReadInteger(Main,'CardsCount',0);
+            If J > 0 then
+              for I := 0 to J -1 do
+                begin
+                  S := Ini.ReadString(Main,IntToStr(I)+'_Card','');
+                  If S <> '' then
+                    RunCMD('pacmd set-card-profile "'+S+'"');
+                end;
             //Lade Virtuelle Sinks:
             for I := 0 to Length(AD) -1 do
               if (AD[I].Typ = PDT_Speaker) and (AD[I].VSink = True) then
@@ -1110,6 +1248,14 @@ begin
               Ini.WriteBool(Main,IntToStr(I)+'_VSink',PD[I].VSink);     
               Ini.WriteString(Main,IntToStr(I)+'_Volume',PD[I].Volume);     
               Ini.WriteBool(Main,IntToStr(I)+'_VolMute',PD[I].Vol_Muted);
+            end;
+          if Length(PC) > 0 then
+            begin
+              Ini.WriteInteger(Main,'CardsCount',Length(PC));
+              for I := 0 to Length(PC) -1 do
+                if (PC[I].PulseName <> '') and (PC[I].CurrentProp > 0) and (PC[I].Props[PC[I].CurrentProp].PulseName <> '') then
+                  Ini.WriteString(Main,IntToStr(I)+'_Card',PC[I].PulseName+'" "'+PC[I].Props[PC[I].CurrentProp].PulseName) Else
+                  Ini.WriteString(Main,IntToStr(I)+'_Card','');
             end;
         Result := True;
       finally
@@ -1584,6 +1730,19 @@ begin
         end;
 end;
 
+procedure TMainFRM.M5_ItemClick(Sender: TObject);
+var
+  I, J: Integer;
+begin
+  I := (Sender as TMenuItem).Tag div 10000;
+  J := (Sender as TMenuItem).Tag - (I * 10000);
+  if (Length(Dev.PC) >= I) and (Length(Dev.PC[I].Props) >= J) then
+    begin
+       RunCMD('pacmd set-card-profile "'+Dev.PC[I].PulseName+'" "'+Dev.PC[I].Props[J].PulseName+'"');
+       Dev.LoadFromPulse;
+    end;
+end;
+
 procedure TMainFRM.FormResize(Sender: TObject);
 begin
   //Nicht notwenig.. Wird bei Repaint der Grafik erledigt.. Ähh doch notwendig... Zeichnen wird nicht mehr durch On Paint gemacht
@@ -1612,6 +1771,7 @@ begin
     Ini.WriteInteger(Ini_Main,'Height',MainFrm.Height);
     Ini.WriteBool(Ini_Main,'DarkMode',M01_OP_DarkM.Checked);
     Ini.WriteBool(Ini_Main,'AutoReload',M01_OP_AutoReload.Checked);
+    Ini.WriteBool(Ini_Main,'HideCards',M01_OP_HideCards.Checked);
     Ini.WriteBool(Ini_Main,'OnTop',M01_OP_OnTop.Checked);
     Ini.WriteInteger(Ini_File,'Count',RecentFiles.Count);
     If RecentFiles.Count > 0 then
@@ -1661,10 +1821,11 @@ begin
       MainFrm.WindowState := wsMaximized;
     M01_OP_DarkM.Checked := Ini.ReadBool(Ini_Main,'DarkMode',False);     
     SetDarkMode(M01_OP_DarkM.Checked);
-    M01_OP_AutoReload.Checked := Ini.ReadBool(Ini_Main,'AutoReload',False);   
+    M01_OP_AutoReload.Checked := Ini.ReadBool(Ini_Main,'AutoReload',True);
+    M01_OP_HideCards.Checked := Ini.ReadBool(Ini_Main,'HideCards',True);
     AutoT_Cnt := 0;
     AutoT.Enabled := M01_OP_AutoReload.Checked;
-    M5_Reload.Visible := not M01_OP_AutoReload.Checked;
+    M6_Reload.Visible := not M01_OP_AutoReload.Checked;
     M01_OP_OnTop.Checked := Ini.ReadBool(Ini_Main,'OnTop',False);      
     If M01_OP_OnTop.Checked then
       FormStyle:=fsSystemStayOnTop Else
@@ -1745,17 +1906,18 @@ begin
     end;
 end;
 
-procedure TMainFRM.M01_NewClick(Sender: TObject);
-begin
-
-end;
-
 procedure TMainFRM.M01_OP_AutoReloadClick(Sender: TObject);
 begin
   M01_OP_AutoReload.Checked := not M01_OP_AutoReload.Checked;
   AutoT_Cnt := 0;
   AutoT.Enabled := M01_OP_AutoReload.Checked;
-  M5_Reload.Visible := not M01_OP_AutoReload.Checked;
+  M6_Reload.Visible := not M01_OP_AutoReload.Checked;
+end;
+
+procedure TMainFRM.M01_OP_HideCardsClick(Sender: TObject);
+begin
+  M01_OP_HideCards.Checked := not M01_OP_HideCards.Checked;
+  Dev.LoadFromPulse(True);
 end;
 
 procedure TMainFRM.M01_OP_OnTopClick(Sender: TObject);
@@ -1844,7 +2006,7 @@ begin
   Dev.LoadFromPulse;
 end;
 
-procedure TMainFRM.M5_ReloadClick(Sender: TObject);
+procedure TMainFRM.M6_ReloadClick(Sender: TObject);
 begin
   Dev.LoadFromPulse;
   //Only for debugging:

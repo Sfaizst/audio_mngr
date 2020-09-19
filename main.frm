@@ -1,12 +1,11 @@
 object MainFRM: TMainFRM
   Left = 346
-  Height = 488
+  Height = 498
   Top = 250
-  Width = 526
+  Width = 537
   Caption = 'PulseAudio Cable Manager'
-  ClientHeight = 488
-  ClientWidth = 526
-  DesignTimePPI = 94
+  ClientHeight = 498
+  ClientWidth = 537
   DoubleBuffered = True
   Icon.Data = {
     3E22000000000100010040400000010010003422000016000000280000004000
@@ -291,12 +290,12 @@ object MainFRM: TMainFRM
   OnShow = FormShow
   ParentDoubleBuffered = False
   Position = poScreenCenter
-  LCLVersion = '7.0'
+  LCLVersion = '7.1'
   object CalcLab: TLabel
-    Left = 337
-    Height = 21
-    Top = 392
-    Width = 46
+    Left = 344
+    Height = 17
+    Top = 400
+    Width = 51
     Caption = 'CalcLab'
     ParentColor = False
     ParentFont = False
@@ -304,16 +303,16 @@ object MainFRM: TMainFRM
   end
   object SB: TScrollBox
     Left = 0
-    Height = 488
+    Height = 498
     Top = 0
-    Width = 526
+    Width = 537
     HorzScrollBar.Page = 1
     HorzScrollBar.Visible = False
     VertScrollBar.Page = 336
     VertScrollBar.Tracking = True
     Align = alClient
-    ClientHeight = 486
-    ClientWidth = 524
+    ClientHeight = 496
+    ClientWidth = 535
     Color = clWhite
     ParentColor = False
     ParentFont = False
@@ -323,9 +322,9 @@ object MainFRM: TMainFRM
     OnMouseUp = SBMouseUp
     object BI: TImage
       Left = 0
-      Height = 88
+      Height = 90
       Top = 0
-      Width = 88
+      Width = 90
       OnMouseDown = SBMouseDown
       OnMouseLeave = SBMouseLeave
       OnMouseMove = PB_NewLineMouseMove
@@ -349,8 +348,8 @@ object MainFRM: TMainFRM
     end
   end
   object MainMenu: TMainMenu
-    Left = 75
-    Top = 64
+    Left = 77
+    Top = 65
     object M1_File: TMenuItem
       Caption = 'File'
       object M01_Load: TMenuItem
@@ -374,14 +373,22 @@ object MainFRM: TMainFRM
         Caption = 'Options...'
         object M01_OP_DarkM: TMenuItem
           Caption = 'Dark Mode'
+          ShowAlwaysCheckable = True
           OnClick = M01_OP_DarkMClick
         end
         object M01_OP_AutoReload: TMenuItem
           Caption = 'Auto Reload'
+          ShowAlwaysCheckable = True
           OnClick = M01_OP_AutoReloadClick
+        end
+        object M01_OP_HideCards: TMenuItem
+          Caption = 'Hide unused cardsockets'
+          ShowAlwaysCheckable = True
+          OnClick = M01_OP_HideCardsClick
         end
         object M01_OP_OnTop: TMenuItem
           Caption = 'Stay on top'
+          ShowAlwaysCheckable = True
           OnClick = M01_OP_OnTopClick
         end
       end
@@ -425,14 +432,17 @@ object MainFRM: TMainFRM
     object M4_DefMicrofone: TMenuItem
       Caption = 'Default Mic'
     end
-    object M5_Reload: TMenuItem
+    object M5_CardConfig: TMenuItem
+      Caption = 'Card Config'
+    end
+    object M6_Reload: TMenuItem
       Caption = 'Reload Devices from Pulse'
-      OnClick = M5_ReloadClick
+      OnClick = M6_ReloadClick
     end
   end
   object RC: TPopupMenu
-    Left = 290
-    Top = 208
+    Left = 296
+    Top = 212
     object RC_Del: TMenuItem
       Caption = 'Delete...'
       OnClick = RC_DelClick
@@ -442,7 +452,7 @@ object MainFRM: TMainFRM
     Enabled = False
     Interval = 100
     OnTimer = AutoTTimer
-    Left = 274
-    Top = 64
+    Left = 280
+    Top = 65
   end
 end
