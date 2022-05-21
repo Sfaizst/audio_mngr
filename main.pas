@@ -20,6 +20,7 @@ const
   PDT_LoopSpk = 64;    
   PDT_Loop = 128;
   PDT_UnknownDev = 256;
+  MAX_CAPSIZE = 60;
 
 type
   TPulseDevice = record
@@ -1506,6 +1507,7 @@ var
   Bitmap: TBitmap;
   TX: Integer;
   Col: Integer;
+  S: String;
 begin
   If (FOldD.Name <> D.Name) or (FOldD.Volume <> D.Volume) then
     begin
@@ -1574,11 +1576,31 @@ begin
         Bitmap.Canvas.Line(10,Fheight-11,0,Fheight-6);
       end;
     if FSecCaption <> '' then
-      begin  
-        Bitmap.Canvas.TextOut(TX,3,FMainCaption);
-        Bitmap.Canvas.TextOut(TX,FTextHeight+3,FSecCaption);
+      begin
+        S := FMainCaption;
+        If Length(S) > MAX_CAPSIZE+2 then
+          begin
+            S := Copy(S,1,MAX_CAPSIZE);
+            S := S + '..';
+          end;
+        Bitmap.Canvas.TextOut(TX,3,S);
+        S := FSecCaption;
+        If Length(S) > MAX_CAPSIZE+2 then
+          begin
+            S := Copy(S,1,MAX_CAPSIZE);
+            S := S + '..';
+          end;
+        Bitmap.Canvas.TextOut(TX,FTextHeight+3,S);
       end else
-        Bitmap.Canvas.TextOut(TX,3,FMainCaption);
+      begin
+        S := FMainCaption;
+        If Length(S) > MAX_CAPSIZE+2 then
+          begin
+            S := Copy(S,1,MAX_CAPSIZE);
+            S := S + '..';
+          end;
+        Bitmap.Canvas.TextOut(TX,3,S);
+      end;
     Dev.FImage.Canvas.Draw(X, Y, Bitmap);
   finally
     Bitmap.Free;
@@ -1645,13 +1667,26 @@ end;
 function TDevice.GetWidth: Integer;
 var
   L1, L2: Integer;
+  S: String;
 begin
   if FMainCaption = '' then
     FSetCaption;
-  MainFrm.CalcLab.Caption := FMainCaption;
-  L1 := 25 + MainFrm.CalcLab.Canvas.TextWidth(FMainCaption);
-  MainFrm.CalcLab.Caption := FSecCaption;
-  L2 := 25 + MainFrm.CalcLab.Canvas.TextWidth(FSecCaption);
+  S := FMainCaption;
+  If Length(S) > MAX_CAPSIZE+2 then
+    begin
+      S := Copy(S,1,MAX_CAPSIZE);
+      S := S + '..';
+    end;
+  MainFrm.CalcLab.Caption := S;
+  L1 := 25 + MainFrm.CalcLab.Canvas.TextWidth(S);  
+  S := FSecCaption;
+  If Length(S) > MAX_CAPSIZE+2 then
+    begin
+      S := Copy(S,1,MAX_CAPSIZE);
+      S := S + '..';
+    end;
+  MainFrm.CalcLab.Caption := S;
+  L2 := 25 + MainFrm.CalcLab.Canvas.TextWidth(S);
   MainFrm.CalcLab.Caption := '';
   If L1 > L2 then
     L2 := L1;
@@ -1843,7 +1878,9 @@ begin
     Ini.Free;
   end;
   Dev := TDeviceMngt.Create;
-  Dev.LoadFromPulse;
+  If (ParamStr(1) <> '') and (FileExists(ParamStr(1))) then
+    Dev.LoadFromFile(ParamStr(1)) Else
+    Dev.LoadFromPulse;
 end;
 
 procedure TMainFRM.UpdateLoadMenu;

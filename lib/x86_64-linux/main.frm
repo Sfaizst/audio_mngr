@@ -290,14 +290,13 @@ object MainFRM: TMainFRM
   OnShow = FormShow
   ParentDoubleBuffered = False
   Position = poScreenCenter
-  LCLVersion = '7.1'
+  LCLVersion = '7.6'
   object CalcLab: TLabel
     Left = 344
     Height = 17
     Top = 400
     Width = 51
     Caption = 'CalcLab'
-    ParentColor = False
     ParentFont = False
     Visible = False
   end
@@ -311,8 +310,8 @@ object MainFRM: TMainFRM
     VertScrollBar.Page = 336
     VertScrollBar.Tracking = True
     Align = alClient
-    ClientHeight = 496
-    ClientWidth = 535
+    ClientHeight = 494
+    ClientWidth = 533
     Color = clWhite
     ParentColor = False
     ParentFont = False
