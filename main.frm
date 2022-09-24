@@ -1,7 +1,7 @@
 object MainFRM: TMainFRM
-  Left = 346
+  Left = 344
   Height = 498
-  Top = 250
+  Top = 256
   Width = 537
   Caption = 'PulseAudio Cable Manager'
   ClientHeight = 498
@@ -310,8 +310,8 @@ object MainFRM: TMainFRM
     VertScrollBar.Page = 336
     VertScrollBar.Tracking = True
     Align = alClient
-    ClientHeight = 494
-    ClientWidth = 533
+    ClientHeight = 496
+    ClientWidth = 535
     Color = clWhite
     ParentColor = False
     ParentFont = False
@@ -389,6 +389,11 @@ object MainFRM: TMainFRM
           Caption = 'Stay on top'
           ShowAlwaysCheckable = True
           OnClick = M01_OP_OnTopClick
+        end
+        object M01_OP_Mode_Pipewire: TMenuItem
+          Caption = 'Mode: Pipewire'
+          ShowAlwaysCheckable = True
+          OnClick = M01_OP_Mode_PipewireClick
         end
       end
       object M01_Exit: TMenuItem

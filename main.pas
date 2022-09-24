@@ -172,6 +172,7 @@ type
     M01_LoadRecent: TMenuItem;
     M5_CardConfig: TMenuItem;
     M01_OP_HideCards: TMenuItem;
+    M01_OP_Mode_Pipewire: TMenuItem;
     RC_Del: TMenuItem;
     PB_NewLine: TPaintBox;
     RC: TPopupMenu;
@@ -185,6 +186,7 @@ type
     procedure M01_LoadClick(Sender: TObject);
     procedure M01_OP_AutoReloadClick(Sender: TObject);
     procedure M01_OP_HideCardsClick(Sender: TObject);
+    procedure M01_OP_Mode_PipewireClick(Sender: TObject);
     procedure M01_OP_OnTopClick(Sender: TObject);
     procedure M01_SaveAsClick(Sender: TObject);
     procedure M02_AddLoopClick(Sender: TObject);
@@ -232,6 +234,7 @@ var
   //Farben:
   clLines: TColor;
   clBackgr: TColor;
+  Mode_Pipewire: Boolean;
 
 implementation
 
@@ -288,6 +291,7 @@ begin
   Result := '';
   TS := TStringList.Create;
   try
+    //WriteLn(Cmd);         //DEBUG
     GetProcess(Cmd,TS);
     Result := TS.Text;
   finally
@@ -360,17 +364,29 @@ begin
   SL := tStringList.Create;
   try
     //Get Default Devices:
-    GetProcess('pacmd stat',SL);
-    DefaultSink := '';
-    DefaultMic := '';
-    If SL.Count > 0 then
-      for I := 0 to SL.Count -1 do
-        if (DefaultSink <> '') and (DefaultMic <> '') then
-          break Else
-        if Pos('Default sink name: ',SL[I]) > 0 then
-          DefaultSink := CopyFromPos(SL[I],'Default sink name: ') Else
-        if Pos('Default source name: ',SL[I]) > 0 then
-          DefaultMic := CopyFromPos(SL[I],'Default source name: ');
+    If Mode_Pipewire = true then
+      begin
+        DefaultSink := '';
+        DefaultMic := '';
+        GetProcess('pactl get-default-sink',SL);
+        If SL.Count > 0 then
+          DefaultSink := SL[0];
+        SL.Clear;
+        GetProcess('pactl get-default-source',SL);
+        If SL.Count > 0 then
+          DefaultMic := SL[0];
+      end else
+      begin
+        GetProcess('pacmd stat',SL);
+        If SL.Count > 0 then
+          for I := 0 to SL.Count -1 do
+            if (DefaultSink <> '') and (DefaultMic <> '') then
+              break Else
+            if Pos('Default sink name: ',SL[I]) > 0 then
+              DefaultSink := CopyFromPos(SL[I],'Default sink name: ') Else
+            if Pos('Default source name: ',SL[I]) > 0 then
+              DefaultMic := CopyFromPos(SL[I],'Default source name: ');
+      end;
     Comp := DefaultSink;
     Comp := Comp + DefaultMic;
     //Get Device Data:
@@ -511,22 +527,37 @@ begin
                         SetLength(ND.Media_Name,Length(ND.Media_Name)-1);
                         Comp := Comp + ND.Media_Name;
                       end;
-                    If (ND.Typ = PDT_Recorder) and (Copy(ND.Media_Name,1,12)='Loopback to ') then
+                    If Mode_Pipewire = True then
                       begin
-                        ND.Typ := PDT_LoopRec;
-                        Delete(ND.Media_Name,1,12);
-                      end Else
-                    If ND.Typ = PDT_Player then
-                      If Copy(ND.Media_Name,1,12)='Loopback of ' then
-                        begin
-                          ND.Typ := PDT_LoopSpk;
-                          Delete(ND.Media_Name,1,12);
-                        end Else
-                      If Copy(ND.Media_Name,1,14)='Loopback from ' then
-                        begin
-                          ND.Typ := PDT_LoopSpk;
-                          Delete(ND.Media_Name,1,14);
-                        end;
+                        If (ND.Typ = PDT_Recorder) and (Copy(ND.Media_Name,1,8)='loopback') then
+                          begin
+                            ND.Typ := PDT_LoopRec;
+                            Delete(ND.Media_Name,1,8);
+                          end Else
+                        If (ND.Typ = PDT_Player) and (Copy(ND.Media_Name,1,8)='loopback') then
+                          begin
+                            ND.Typ := PDT_LoopSpk;
+                            Delete(ND.Media_Name,1,8);
+                          end;
+                      end else
+                      begin
+                        If (ND.Typ = PDT_Recorder) and (Copy(ND.Media_Name,1,12)='Loopback to ') then
+                          begin
+                            ND.Typ := PDT_LoopRec;
+                            Delete(ND.Media_Name,1,12);
+                          end Else
+                        If ND.Typ = PDT_Player then
+                          If Copy(ND.Media_Name,1,12)='Loopback of ' then
+                            begin
+                              ND.Typ := PDT_LoopSpk;
+                              Delete(ND.Media_Name,1,12);
+                            end Else
+                          If Copy(ND.Media_Name,1,14)='Loopback from ' then
+                            begin
+                              ND.Typ := PDT_LoopSpk;
+                              Delete(ND.Media_Name,1,14);
+                            end;
+                      end;
                   end;
                 If Pos('application.process.binary = "',SL[I]) > 0 then
                   begin
@@ -1106,7 +1137,9 @@ begin
                 begin
                   S := Ini.ReadString(Main,IntToStr(I)+'_Card','');
                   If S <> '' then
-                    RunCMD('pacmd set-card-profile "'+S+'"');
+                    If Mode_Pipewire = True then
+                      RunCMD('pactl set-card-profile "'+S+'"') else
+                      RunCMD('pacmd set-card-profile "'+S+'"');
                 end;
             //Lade Virtuelle Sinks:
             for I := 0 to Length(AD) -1 do
@@ -1148,14 +1181,26 @@ begin
             if Length(PD) > 0 then
               for I := 0 to Length(AD) -1 do
                 if (AD[I].Typ = PDT_Player) then
-                  RunCmd('pacmd move-sink-input '+AD[I].ID+' '+AD[I].PlayingOn) Else
+                  begin
+                    if Mode_Pipewire = true then
+                      RunCmd('pactl move-sink-input '+AD[I].ID+' '+AD[I].PlayingOn) else
+                      RunCmd('pacmd move-sink-input '+AD[I].ID+' '+AD[I].PlayingOn);
+                  end Else
                 if (AD[I].Typ = PDT_Recorder) then
-                  RunCmd('pacmd move-source-output '+AD[I].ID+' '+AD[I].RecordingFrom);
+                  begin     
+                    if Mode_Pipewire = true then
+                      RunCmd('pactl move-source-output '+AD[I].ID+' '+AD[I].RecordingFrom) else
+                      RunCmd('pacmd move-source-output '+AD[I].ID+' '+AD[I].RecordingFrom);
+                  end;
             //Set Defaults:
             if FDefaultSink <> '' then
-              RunCMD('pacmd set-default-sink "'+FDefaultSink+'"');
-            if FDefaultMic <> '' then         
-              RunCMD('pacmd set-default-source "'+FDefaultMic+'"');
+              if Mode_Pipewire = true then
+                RunCMD('pactl set-default-sink "'+FDefaultSink+'"') else
+                RunCMD('pacmd set-default-sink "'+FDefaultSink+'"');
+            if FDefaultMic <> '' then
+              if Mode_Pipewire = true then
+                RunCMD('pactl set-default-source "'+FDefaultMic+'"') else
+                RunCMD('pacmd set-default-source "'+FDefaultMic+'"');
             LoadFromPulse;
           end;
       finally
@@ -1167,24 +1212,32 @@ end;
 procedure TDeviceMngt.SetMute(AID: Integer; Mute: Boolean);
 var
   cmdstr: String;
+  pastr: String;
 begin
   if Mute then
-    cmdstr := ' true' Else
+    cmdstr := ' truepacmd' Else
     cmdstr := ' false';
+  if Mode_Pipewire = True then
+    pastr := 'pactl' else
+    pastr := 'pacmd';
   if (PD[AID].Typ = PDT_Player) then
-    RunCmd('pacmd set-sink-input-mute '+PD[AID].ID+cmdstr) Else
+    RunCmd(pastr+' set-sink-input-mute '+PD[AID].ID+cmdstr) Else
   if (PD[AID].Typ = PDT_Speaker) then
-    RunCmd('pacmd set-sink-mute '+PD[AID].ID+cmdstr) Else
+    RunCmd(pastr+' set-sink-mute '+PD[AID].ID+cmdstr) Else
   if (PD[AID].Typ = PDT_Microfone) or (Dev.PD[AID].Typ = PDT_Monitor) then
-    RunCmd('pacmd set-source-mute '+PD[AID].ID+cmdstr) Else
+    RunCmd(pastr+' set-source-mute '+PD[AID].ID+cmdstr) Else
   if (PD[AID].Typ = PDT_Recorder) then
-    RunCmd('pacmd set-source-output-mute '+PD[AID].ID+cmdstr);
+    RunCmd(pastr+' set-source-output-mute '+PD[AID].ID+cmdstr);
 end;
 
 procedure TDeviceMngt.SetVol(AID: Integer; AVol: Integer);
 var
-  IVol: Integer;
-begin
+  IVol: Integer;  
+  pastr: String;
+begin        
+  if Mode_Pipewire = True then
+    pastr := 'pactl' else
+    pastr := 'pacmd';
   IVol := -1;
   if (AVol <> -1) and (AVol >= 0) and (AVol <= 100) then
     begin
@@ -1193,13 +1246,13 @@ begin
       IVol := Round((AVol / 100) * 65535);
       if (IVol > -1) and (IVol < 65536) then
         if (PD[AID].Typ = PDT_Player) then
-          RunCMD('pacmd set-sink-input-volume '+PD[AID].ID+' '+IntToStr(IVol)) Else
+          RunCMD(pastr+' set-sink-input-volume '+PD[AID].ID+' '+IntToStr(IVol)) Else
         if (PD[AID].Typ = PDT_Speaker) then
-          RunCMD('pacmd set-sink-volume '+PD[AID].ID+' '+IntToStr(IVol)) Else
+          RunCMD(pastr+' set-sink-volume '+PD[AID].ID+' '+IntToStr(IVol)) Else
         if (PD[AID].Typ = PDT_Microfone) or (Dev.PD[AID].Typ = PDT_Monitor) then
-          RunCMD('pacmd set-source-volume '+PD[AID].Device_Name+' '+IntToStr(IVol)) Else
+          RunCMD(pastr+' set-source-volume '+PD[AID].Device_Name+' '+IntToStr(IVol)) Else
         if (PD[AID].Typ = PDT_Recorder) then
-          RunCMD('pacmd set-source-output-volume '+PD[AID].ID+' '+IntToStr(IVol));
+          RunCMD(pastr+' set-source-output-volume '+PD[AID].ID+' '+IntToStr(IVol));
     end;
 end;
 
@@ -1413,9 +1466,12 @@ end;
 procedure TDeviceMngt.EndCableMove(P: TPoint);
 var
   I, J, K: Integer;
-  S: String;
+  S, pastr: String;
   Applied: Boolean;
 begin
+  if Mode_Pipewire = True then
+    pastr := 'pactl' else
+    pastr := 'pacmd';
   If FDeviceSelected > -1 then
       begin
         Applied := False;
@@ -1437,13 +1493,13 @@ begin
                              if K = PDT_Speaker then
                               begin
                                 //Anwendung --> Speaker
-                                RunCmd('pacmd move-sink-input '+PD[FDeviceSelected].ID+' '+PD[I].Device_Name);
+                                RunCmd(pastr+' move-sink-input '+PD[FDeviceSelected].ID+' '+PD[I].Device_Name);
                                 Applied := True;
                               end;
                 PDT_Speaker: if (K = PDT_Player) or (K = PDT_LoopSpk) then
                               begin
                                 //Speaker --> Anmwendung         
-                                RunCmd('pacmd move-sink-input '+PD[I].ID+' '+PD[FDeviceSelected].Device_Name);
+                                RunCmd(pastr+' move-sink-input '+PD[I].ID+' '+PD[FDeviceSelected].Device_Name);
                                 Applied := True;
                               end;
                 PDT_Microfone, PDT_Monitor: if (K = PDT_Recorder) or (K = PDT_LoopRec) then
@@ -1452,7 +1508,7 @@ begin
                                 If K = PDT_Recorder then
                                   S := PD[I].ID Else
                                   S := PD[I].MicID;
-                                RunCmd('pacmd move-source-output '+S+' '+PD[FDeviceSelected].Device_Name);
+                                RunCmd(pastr+' move-source-output '+S+' '+PD[FDeviceSelected].Device_Name);
                                 Applied := True;
                               end;
                 PDT_Recorder, PDT_LoopRec: if (K = PDT_Microfone) or (K = PDT_Monitor) then
@@ -1461,7 +1517,7 @@ begin
                                 If J = PDT_Recorder then
                                   S := PD[FDeviceSelected].ID Else
                                   S := PD[FDeviceSelected].MicID;
-                                RunCmd('pacmd move-source-output '+S+' '+PD[I].Device_Name);
+                                RunCmd(pastr+' move-source-output '+S+' '+PD[I].Device_Name);
                                 Applied := True;
                               end;
               end;
@@ -1740,12 +1796,16 @@ end;
 procedure TMainFRM.M3_ItemClick(Sender: TObject);
 var
   I: Integer;
+  pastr: String;
 begin
+  if Mode_Pipewire = True then
+    pastr := 'pactl' else
+    pastr := 'pacmd';
   if Length(Dev.PD) > 0 then
     for I := 0 to Length(Dev.PD) -1 do
       if Dev.PD[I].Name = (Sender as TMenuItem).Caption then
         begin
-          RunCMD('pacmd set-default-sink "'+Dev.PD[(Sender as TMenuItem).Tag].Device_Name+'"');
+          RunCMD(pastr+' set-default-sink "'+Dev.PD[(Sender as TMenuItem).Tag].Device_Name+'"');
           Dev.LoadFromPulse;
           break;
         end;
@@ -1753,13 +1813,17 @@ end;
 
 procedure TMainFRM.M4_ItemClick(Sender: TObject);     
 var
-  I: Integer;
-begin      
+  I: Integer;     
+  pastr: String;
+begin
+  if Mode_Pipewire = True then
+    pastr := 'pactl' else
+    pastr := 'pacmd';
   if Length(Dev.PD) > 0 then
     for I := 0 to Length(Dev.PD) -1 do
       if Dev.PD[I].Name = (Sender as TMenuItem).Caption then
         begin
-          RunCMD('pacmd set-default-source "'+Dev.PD[(Sender as TMenuItem).Tag].Device_Name+'"');
+          RunCMD(pastr+' set-default-source "'+Dev.PD[(Sender as TMenuItem).Tag].Device_Name+'"');
           Dev.LoadFromPulse;
           break;
         end;
@@ -1768,12 +1832,16 @@ end;
 procedure TMainFRM.M5_ItemClick(Sender: TObject);
 var
   I, J: Integer;
+  pastr: String;
 begin
+  if Mode_Pipewire = True then
+    pastr := 'pactl' else
+    pastr := 'pacmd';
   I := (Sender as TMenuItem).Tag div 10000;
   J := (Sender as TMenuItem).Tag - (I * 10000);
   if (Length(Dev.PC) >= I) and (Length(Dev.PC[I].Props) >= J) then
     begin
-       RunCMD('pacmd set-card-profile "'+Dev.PC[I].PulseName+'" "'+Dev.PC[I].Props[J].PulseName+'"');
+       RunCMD(pastr+' set-card-profile "'+Dev.PC[I].PulseName+'" "'+Dev.PC[I].Props[J].PulseName+'"');
        Dev.LoadFromPulse;
     end;
 end;
@@ -1808,6 +1876,7 @@ begin
     Ini.WriteBool(Ini_Main,'AutoReload',M01_OP_AutoReload.Checked);
     Ini.WriteBool(Ini_Main,'HideCards',M01_OP_HideCards.Checked);
     Ini.WriteBool(Ini_Main,'OnTop',M01_OP_OnTop.Checked);
+    Ini.WriteBool(Ini_Main, 'Pipewire', Mode_Pipewire);
     Ini.WriteInteger(Ini_File,'Count',RecentFiles.Count);
     If RecentFiles.Count > 0 then
       for I := 0 to RecentFiles.Count -1 do
@@ -1865,6 +1934,8 @@ begin
     If M01_OP_OnTop.Checked then
       FormStyle:=fsSystemStayOnTop Else
       FormStyle:=fsNormal;
+    M01_OP_Mode_Pipewire.Checked := Ini.ReadBool(Ini_Main, 'Pipewire', False);
+    Mode_Pipewire := M01_OP_Mode_Pipewire.Checked;
     FCnt := Ini.ReadInteger(Ini_File,'Count',0);
     If FCnt > 0 then
       for I := 0 to FCnt -1 do
@@ -1955,6 +2026,12 @@ procedure TMainFRM.M01_OP_HideCardsClick(Sender: TObject);
 begin
   M01_OP_HideCards.Checked := not M01_OP_HideCards.Checked;
   Dev.LoadFromPulse(True);
+end;
+
+procedure TMainFRM.M01_OP_Mode_PipewireClick(Sender: TObject);
+begin
+  M01_OP_Mode_Pipewire.Checked := not M01_OP_Mode_Pipewire.Checked;
+  Mode_Pipewire := M01_OP_Mode_Pipewire.Checked;
 end;
 
 procedure TMainFRM.M01_OP_OnTopClick(Sender: TObject);
