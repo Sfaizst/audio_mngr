@@ -15,16 +15,18 @@ Features:
 - Use cables to connect players, speakers, microphones, loops and monitors.
 - Add and manage loops and virtual sinks
 - Save and load configs
-- Change the default speaker and mic via menu
+- Change the default speaker and mic via right click
 
 Settings (via "File" --> "Options"):
 - Dark Mode (more eye-friendly)
 - Automatic reload of devices / programs if a change happends (seems to be stable so far)
 - Option for always stay on top above all other programs
+- Option to disable / enable the usage of pipewire
+- Option to change the latency of loops (0..65536) in milliseconds (only works before the are created)
 
 Installation:
-- Download the i386 or x64 version of this tool for your PC
-- Make sure pulse is installed on your PC
+- Download the i386 or x64 version of this tool from the /bin subdirectory for your PC
+- Make sure pulse or pipewire is installed on your PC
 - Mark the the binary as executeable
 
 Basic usage:
@@ -35,8 +37,11 @@ Basic usage:
     - The connection is made via "Drag'n'Drop"
 - Middle mousclick:
     - Mutes / Unmutes a device (is shown in gray)
+ - Middle mouse-wheel:
+ 	- Changes the volume of a device
 - Right mouseclick:
-    - if the device is virtual (loop or virtual sink) a popup menu will show up, so that you can delete the device.
+    - Íf the device is virtual (loop or virtual sink) a popup menu will show up, so that you can delete the device.
+    - If a device isn't default you can set it as default
 - Other options (Save... / Load... / Default (Speaker / Mic) are in the menu at the top of the program)
 
 How to compile:

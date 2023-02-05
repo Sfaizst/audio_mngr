@@ -21,6 +21,7 @@ const
   PDT_Loop = 128;
   PDT_UnknownDev = 256;
   MAX_CAPSIZE = 60;
+  MAX_VOL = 153;
 
 type
   TPulseDevice = record
@@ -42,6 +43,8 @@ type
     RecordingFrom: String;
     Volume: String;
     Vol_Muted: Boolean;
+    DefaultSink: Boolean;     
+    DefaultSource: Boolean;
   end;
 
 type
@@ -81,8 +84,12 @@ type
     FWidth, FHeight: Integer;
     FX, FY: Integer;
     FSelected: Boolean;
+    FDefaultSink: Boolean;  
+    FDefaultSource: Boolean;
     FOldD: TPulseDevice;
     procedure FSetCaption;
+    procedure FSetDefaultSink(ADefault: Boolean);  
+    procedure FSetDefaultSource(ADefault: Boolean);
     procedure SetFX(AX: Integer);
     procedure SetFY(AY: Integer);
     function GetWidth: Integer;     
@@ -96,6 +103,8 @@ type
     property Width: Integer read GetWidth;
     property Height: Integer read GetHeight;
     property Selected: Boolean read FSelected write FSelected;
+    property DefaultSink: Boolean read FDefaultSink write FSetDefaultSink;
+    property DefaultSource: Boolean read FDefaultSource write FSetDefaultSource;
     constructor Create(AD: TPulseDevice);
     procedure Paint;
   end;
@@ -113,9 +122,9 @@ type
       FDefaultSink: String;
       FDefaultMic: String;
       function FCheckSelectedCable(ACable: TCable; Mouse: TPoint): Boolean;
-      procedure FGetLinePoint(ADev: TDevice; var PlyP: TPoint; var RecP: TPoint);
+      procedure FGetLinePoint(ADev: TDevice; var PlyP: TPoint; var RecP: TPoint; const RecUnderPl: Boolean = True);
       procedure FDrawSingleLine(Lower, Higher: TPoint; AColor: Integer);
-      procedure FDrawOneConnection(Lower, Higher: TPoint; AColor: Integer);
+      procedure FDrawOneConnection(Lower, Higher: TPoint; AColor: Integer; OneIsLoop: Boolean; ToLoop: Boolean);
       procedure FDrawDeviceLines(var Con: TCable);
       procedure FCalcConnections;
       procedure FDrawConnections;
@@ -173,6 +182,8 @@ type
     M5_CardConfig: TMenuItem;
     M01_OP_HideCards: TMenuItem;
     M01_OP_Mode_Pipewire: TMenuItem;
+    M01_OP_LoopDelay: TMenuItem;
+    RC_SetDef: TMenuItem;
     RC_Del: TMenuItem;
     PB_NewLine: TPaintBox;
     RC: TPopupMenu;
@@ -186,6 +197,7 @@ type
     procedure M01_LoadClick(Sender: TObject);
     procedure M01_OP_AutoReloadClick(Sender: TObject);
     procedure M01_OP_HideCardsClick(Sender: TObject);
+    procedure M01_OP_LoopDelayClick(Sender: TObject);
     procedure M01_OP_Mode_PipewireClick(Sender: TObject);
     procedure M01_OP_OnTopClick(Sender: TObject);
     procedure M01_SaveAsClick(Sender: TObject);
@@ -202,12 +214,14 @@ type
     procedure PB_NewLineMouseWheelUp(Sender: TObject; Shift: TShiftState;
       MousePos: TPoint; var Handled: Boolean);
     procedure RC_DelClick(Sender: TObject);
+    procedure RC_SetDefClick(Sender: TObject);
     procedure SBMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure SBMouseLeave(Sender: TObject);
     procedure SBMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
   private
+    FCurMouseP: TPoint;
     AutoT_Cnt: Byte;
     RC_Dev: Integer;
     RecentFiles: TStringList;
@@ -235,6 +249,7 @@ var
   clLines: TColor;
   clBackgr: TColor;
   Mode_Pipewire: Boolean;
+  LoopDelay: Integer;
 
 implementation
 
@@ -294,6 +309,7 @@ begin
     //WriteLn(Cmd);         //DEBUG
     GetProcess(Cmd,TS);
     Result := TS.Text;
+    //WriteLn(TS.Text);         //DEBUG
   finally
     TS.Free;
   end;
@@ -314,6 +330,8 @@ function ReloadPulseDevices(var PD: TPulseDevices; var PC: TPulseCards; var Defa
       AD.VSink := False;
       AD.Volume := '';
       AD.Typ := PDT_NULL;
+      AD.DefaultSink := False;  
+      AD.DefaultSource := False;
     end;
   procedure ResetPulseCard(var AC: TPulseCard);
     begin
@@ -472,15 +490,23 @@ begin
                       ND.VSink := True;
                     If ND.Typ = PDT_UnknownDev then
                       if (Pos('.monitor',SL[I]) > 0) then
-                        ND.Typ := PDT_Monitor Else
+                        begin
+                          ND.Typ := PDT_Monitor;
+                          If ND.Device_Name = DefaultMic then
+                            ND.DefaultSource := True;
+                        end Else
                       if (Pos('alsa_input',SL[I]) > 0) then
                         begin
                           ND.Typ := PDT_Microfone;
                           ND.MicID := ND.ID;
+                          If ND.Device_Name = DefaultMic then
+                            ND.DefaultSource := True;
                         end  Else
                         begin
                           ND.Typ := PDT_Speaker;
-                          ND.SpkID := ND.ID;
+                          ND.SpkID := ND.ID;   
+                          If ND.Device_Name = DefaultSink then
+                            ND.DefaultSink := True;
                         end;
                   end;
                 ND.Ident := ND.Device_Name;
@@ -574,8 +600,7 @@ begin
                     Comp := Comp + ND.Module_ID;
                   end;
                 If (ND.Volume = '') and (
-                (Pos('Volume: front-left: ',SL[I]) > 0) or   
-                (Pos('Volume: mono: ',SL[I]) > 0) or
+                (Pos('Volume: ',SL[I]) > 0) or
                 (Pos('Base Volume: ',SL[I]) > 0) ) then
                   begin
                     ND.Volume := CopyFromPos(SL[I],' / ');
@@ -651,7 +676,7 @@ begin
   FDeviceSelected := -1;
 end;            
 
-procedure TDeviceMngt.FGetLinePoint(ADev: TDevice; var PlyP: TPoint; var RecP: TPoint);
+procedure TDeviceMngt.FGetLinePoint(ADev: TDevice; var PlyP: TPoint; var RecP: TPoint; const RecUnderPl: Boolean = True);
 begin
   PlyP.X := -1;
   PlyP.Y := -1;
@@ -660,17 +685,32 @@ begin
   //Eingangspfeil (offen) Links / Oben (Audioeingabe / Lautsprecher):
   if (PDT_Speaker and ADev.D.Typ <> 0) then
     begin
-      PlyP.X := ADev.X;
+      PlyP.X := ADev.X + 10;
       PlyP.Y := ADev.Y + 6;
     end;    
   //Ausgangspfeil (offen) Rechts / Oben (Audioausgabe / Player):
-  if (PDT_Player and ADev.D.Typ <> 0) or (PDT_Loop and ADev.D.Typ <> 0) then
+  if (PDT_Player and ADev.D.Typ <> 0) then
     begin
       PlyP.X := ADev.X + ADev.Width;
       PlyP.Y := ADev.Y + 6;
+    end;         
+  //Ausgangspfeil (offen) Rechts / Oben (Audioausgabe / Player):
+  if (PDT_Loop and ADev.D.Typ <> 0) then
+    begin
+      PlyP.X := ADev.X + ADev.Width div 2;
+      If RecUnderPl = True then
+        begin       
+          PlyP.Y := ADev.Y;    
+          RecP.Y := ADev.Y + ADev.Height;
+        end Else
+        begin     
+          PlyP.Y := ADev.Y + ADev.Height;
+          RecP.Y := ADev.Y;
+        end;
+      RecP.X := ADev.X + ADev.Width div 2;
     end;
   //Eingangspfeil (geschlossen) Rechts / Unten (Audioeingabe / Recorder):
-  if (PDT_Recorder and ADev.D.Typ <> 0) or (PDT_Loop and ADev.D.Typ <> 0) then
+  if (PDT_Recorder and ADev.D.Typ <> 0) then
     begin
       RecP.X := ADev.X + ADev.Width;
       RecP.Y := ADev.Y + ADev.Height -6;
@@ -678,7 +718,7 @@ begin
   //Ausgangspfeil Unten (Audioausgabe / Mikrofon / Monitor):
   if (PDT_Microfone and ADev.D.Typ <> 0) or (PDT_Monitor and ADev.D.Typ <> 0) then
     begin
-      RecP.X := ADev.X;
+      RecP.X := ADev.X + 10;
       RecP.Y := ADev.Y + ADev.Height -6;
     end;
   If RecP.X = -1 then
@@ -717,40 +757,64 @@ begin
   MainFrm.PB_NewLine.Canvas.Line(Lower.X,Lower.Y,Higher.X,Higher.Y);
 end;
 
-procedure TDeviceMngt.FDrawOneConnection(Lower, Higher: TPoint; AColor: Integer);
+procedure TDeviceMngt.FDrawOneConnection(Lower, Higher: TPoint; AColor: Integer; OneIsLoop: Boolean; ToLoop: Boolean);
 begin
   FImage.Canvas.Pen.Color := AColor;
   FImage.Canvas.Pen.Width := 3;
-  //Device -->
-  FImage.Canvas.Line(Lower.X,Lower.Y,Lower.X+( (Higher.X - Lower.X) div 2)+20,Lower.Y);
-  //Line
-  FImage.Canvas.Line(Lower.X+( (Higher.X - Lower.X) div 2)+20,Lower.Y,Higher.X-30,Higher.Y);
-  //--> Device
-  FImage.Canvas.Line(Higher.X,Higher.Y,Higher.X-30,Higher.Y);
+  if not OneIsLoop then
+    begin
+      //Device -->
+      FImage.Canvas.Line(Lower.X,Lower.Y,Lower.X+( (Higher.X - Lower.X) div 2)+20,Lower.Y);
+      //Line
+      FImage.Canvas.Line(Lower.X+( (Higher.X - Lower.X) div 2)+20,Lower.Y,Higher.X-30,Higher.Y);
+      //--> Device
+      FImage.Canvas.Line(Higher.X,Higher.Y,Higher.X-30,Higher.Y);
+    end else
+    begin      
+      //Device -->
+      If ToLoop then
+        begin
+          FImage.Canvas.Line(Higher.X-50,Lower.Y+5,Higher.X-45,Lower.Y);
+          FImage.Canvas.Line(Higher.X-50,Lower.Y-5,Higher.X-45,Lower.Y);
+        end else
+        begin    
+          FImage.Canvas.Line(Higher.X-45,Lower.Y+5,Higher.X-50,Lower.Y);
+          FImage.Canvas.Line(Higher.X-45,Lower.Y-5,Higher.X-50,Lower.Y);
+        end;
+      FImage.Canvas.Line(Lower.X,Lower.Y,Higher.X,Lower.Y);
+      //--> Device
+      FImage.Canvas.Line(Higher.X,Lower.Y,Higher.X,Higher.Y);
+    end;
 end;
 
 procedure TDeviceMngt.FDrawDeviceLines(var Con: TCable);
 var
   P1, P2: TPoint;
+  Loop, FromLoop: Boolean;
 begin
-  FGetLinePoint(Devs[Con.Input],P1,P2);
+  FromLoop := False;
+  Loop := (Devs[Con.Input].D.Typ = PDT_Loop) or (Devs[Con.Output].D.Typ = PDT_Loop);
+  FGetLinePoint(Devs[Con.Input],P1,P2, Loop);
   if Devs[Con.Input].D.Typ = PDT_Loop then
     begin
       if (Devs[Con.Output].D.Typ = PDT_Monitor) or (Devs[Con.Output].D.Typ = PDT_Microfone) then
         Con.Start := P2 Else
         Con.Start := P1;
     end Else
+    begin
       Con.Start := P2;
+    end;
   FGetLinePoint(Devs[Con.Output],P1,P2);
   if Devs[Con.Output].D.Typ = PDT_Loop then
     begin
+      FromLoop := True;
       if (Devs[Con.Input].D.Typ = PDT_Monitor) or (Devs[Con.Input].D.Typ = PDT_Microfone) then
         Con.Goal := P2 Else
         Con.Goal := P1;
     end Else
       Con.Goal := P2;
   GetLowerHigher(Con.Start,Con.Goal,Con.Lower,Con.Higher);
-  FDrawOneConnection(Con.Lower, Con.Higher,Con.Color);
+  FDrawOneConnection(Con.Lower, Con.Higher,Con.Color, Loop, FromLoop);
 end;
 
 procedure TDeviceMngt.FCalcConnections;
@@ -883,9 +947,13 @@ procedure TDeviceMngt.Repaint;
       end;
   end;
 var
-  I, J : Integer;
-  MaxLeftWidth, MaxRightWidth: Integer;
+  I, J, K : Integer;
+  MaxLeftWidth, MaxRightWidth, LoopSpace: Integer;
   LeftH, RightH: Integer;
+  Loops: Word;
+  Loopw: Word;
+  LoopTopH, LoopBtmH, LoopY: Word;
+  LoopYs: Array of Word;
 begin
   if (Length(PD) > 0) and (FRepainting = False) then
     begin
@@ -903,8 +971,17 @@ begin
              begin       
                If MaxRightWidth < Devs[I].Width then
                  MaxRightWidth := Devs[I].Width;
-             end;
-      MainFRM.Constraints.MinWidth := MaxLeftWidth + MaxRightWidth + 150;
+             end;        
+      Loops := 0;
+      Loopw := 0;
+      for I := 0 to Length(PD) -1 do
+        if PDT_Loop and PD[I].Typ <> 0 then
+          begin
+            Inc(Loops);
+            Loopw := Devs[I].Width;
+          end;
+      LoopSpace := Loopw * Loops;
+      MainFRM.Constraints.MinWidth := MaxLeftWidth + MaxRightWidth + LoopSpace + 150;
       If MainFrm.Width < MainFRM.Constraints.MinWidth then
         MainFrm.Width := MainFRM.Constraints.MinWidth;
       LeftH := 10;
@@ -915,14 +992,14 @@ begin
             begin
               Devs[I].Y := RightH;
               RightH := RightH + (Devs[I].Height + 20);
-              Devs[I].X := MainFrm.Width - MaxRightWidth - 30;
+              Devs[I].X := MainFrm.Width - MaxRightWidth - LoopSpace - 30;
               for J := 0 to Length(PD) -1 do
                 if (PDT_Monitor and PD[J].Typ <> 0) and (PD[J].Device_Name = PD[I].Device_Name + '.monitor') then
                   begin
                     RightH := RightH -23;
                     Devs[J].Y := RightH;
                     RightH := RightH + (Devs[J].Height + 20); 
-                    Devs[J].X := MainFrm.Width - MaxRightWidth - 30;
+                    Devs[J].X := MainFrm.Width - MaxRightWidth - LoopSpace - 30;
                     break;
                   end;
             end Else
@@ -933,15 +1010,6 @@ begin
               Devs[I].X := 10;
             end;
         end;
-      for I := 0 to Length(PD) -1 do
-        begin
-          if PDT_Loop and PD[I].Typ <> 0 then
-            begin              
-              Devs[I].Y := LeftH;
-              Devs[I].X := 10;
-              LeftH := LeftH + (Devs[I].Height + 20);
-            end;
-        end;      
       if LeftH < RightH then
         LeftH := RightH Else
         RightH := LeftH;
@@ -956,10 +1024,91 @@ begin
           if PDT_Microfone and PD[I].Typ <> 0 then
             begin
               Devs[I].Y := RightH;
-              Devs[I].X := MainFrm.Width - MaxRightWidth - 30;
+              Devs[I].X := MainFrm.Width - MaxRightWidth - LoopSpace - 30;
               RightH := RightH + (Devs[I].Height + 20);
             end;
-        end;   
+        end;
+      If Loops > 0 then
+        begin
+          SetLength(LoopYs,Loops);
+          Loops := 0;
+          for I := 0 to Length(PD) -1 do
+            begin
+              if PDT_Loop and PD[I].Typ <> 0 then
+                begin
+                  LoopTopH := 0;    
+                  LoopBtmH := 0;
+                  LoopY := RightH div 2;
+                  for J := 0 to High(PD) do
+                    begin
+                      If PD[I].PlayingOn = PD[J].ID then
+                        LoopTopH := Devs[J].Y + (Devs[J].Height div 2);  
+                      If PD[I].RecordingFrom = PD[J].ID then
+                        LoopBtmH := Devs[J].Y + (Devs[J].Height div 2);
+                      If (LoopBtmH > 0) and (LoopTopH > 0) then
+                        begin
+                          If LoopTopH < LoopBtmH then
+                            begin
+                              LoopYs[Loops] := (LoopBtmH - LoopTopH) div 2;
+                              LoopY := LoopTopH + LoopYs[Loops];
+                            end else
+                            begin      
+                              LoopYs[Loops] := (LoopTopH - LoopBtmH) div 2;
+                              LoopY := LoopBtmH + LoopYs[Loops];
+                            end;
+                          break;
+                        end;
+                    end;
+                  Devs[I].Y := LoopY;
+                  Inc(Loops);
+                end;
+            end;
+          //Sorge dafür, dass nie die gleiche Größe da ist:
+          for Loops := High(LoopYs) downto 0 do
+            if Loops > 0 then
+              for LoopY := Loops -1 downto 0 do
+                if LoopYs[Loops] = LoopYs[LoopY] then
+                  LoopYs[Loops] := LoopYs[Loops] +1;   
+          Loops := 0;
+          LoopTopH := 0;
+          for Loops := 0 to High(LoopYs) do
+            begin        
+              LoopBtmH := 65000;
+              LoopY := 0;
+              //Erhalte das kleinste Element:
+              for I := 0 to High(LoopYs) do
+                 If (LoopYs[I] < LoopBtmH) and (LoopYs[I] > LoopTopH) then
+                   begin
+                     LoopY := I;
+                     LoopBtmH := LoopYs[I];
+                   end;
+              LoopTopH := LoopBtmH;
+              J := -1;
+              //Erhalte das passende Elemnt zur Indexnummer:
+              while J < LoopY do
+                begin
+                  for K := 0 to High(PD) do
+                    if PDT_Loop and PD[K].Typ <> 0 then
+                      begin
+                        Inc(J);
+                        If J = LoopY then
+                          Devs[K].X := MainFrm.Width - 15 - (Loopw * (Length(LoopYs) - Loops));
+                      end;
+                end;
+            end;
+          //Korrigiere, Loops, die zu klein sind, oder auf eiegen Positionen laufen:
+          I := 0;
+          for K := 0 to High(PD) do
+            if (PDT_Loop and PD[K].Typ <> 0) and (Devs[K].X < MainFrm.Width - MaxRightWidth - LoopSpace - 30) then
+              Inc(I);
+          if I > 0 then   
+            for K := 0 to High(PD) do
+              if (PDT_Loop and PD[K].Typ <> 0) and (Devs[K].X < MainFrm.Width - MaxRightWidth - LoopSpace - 30) then
+                begin
+                  Devs[K].X := MainFrm.Width - 15 - LoopSpace - (Loopw * (I));
+                  Dec(I);
+                end;
+        end;       
       if LeftH < RightH then
         LeftH := RightH;
       MainFrm.Update;
@@ -1032,13 +1181,13 @@ begin
     begin
       SetLength(Devs,Length(PD));
       If RedrawMe then
-        begin
+        begin          { DEFAULT-MENU nicht mehr notwendig!
           if MainFrm.M3_DefSpeakers.Count > 0 then
             for I := MainFrm.M3_DefSpeakers.Count -1 downto 0 do
               MainFrm.M3_DefSpeakers.Delete(I);
           if MainFrm.M4_DefMicrofone.Count > 0 then
             for I := MainFrm.M4_DefMicrofone.Count -1 downto 0 do
-              MainFrm.M4_DefMicrofone.Delete(I);
+              MainFrm.M4_DefMicrofone.Delete(I);        }
           if MainFrm.M5_CardConfig.Count > 0 then
             for I := MainFrm.M5_CardConfig.Count -1 downto 0 do
               begin
@@ -1071,7 +1220,7 @@ begin
                 end;
         end;
       for I := 0 to Length(PD) -1 do
-        begin
+        begin   { DEFAULT-MENU nicht mehr notwendig!
           if (RedrawMe) and (PD[I].Typ = PDT_Speaker) then
             begin
               AddMenuItem(MainFrm.M3_DefSpeakers,PD[I].Name,@MainFrm.M3_ItemClick);
@@ -1087,7 +1236,7 @@ begin
               if PD[I].Device_Name = FDefaultMic then
                 MainFrm.M4_DefMicrofone.Items[MainFrm.M4_DefMicrofone.Count -1].Checked := True Else
                 MainFrm.M4_DefMicrofone.Items[MainFrm.M4_DefMicrofone.Count -1].Checked := False;
-            end;
+            end;      }
           Devs[I] := TDevice.Create(PD[I]);
         end;
       If RedrawMe then
@@ -1100,22 +1249,24 @@ const
   Main = 'Devices';
 var
   Ini: TIniFile;
-  I, J: Integer;
+  I, J, K: Integer;
   AD: TPulseDevices;
   S, T: String;
+  ADefaultSink, ADefaultMic: String;
 begin
   if (AFileName <> '') and (FileExists(AFileName)) then
     begin
       Ini := TIniFile.Create(AFileName);
       try
         SetLength(AD,Ini.ReadInteger(Main,'Count',0));        
-        FDefaultSink := Ini.ReadString(Main,'DefaultSink','');
-        FDefaultMic := Ini.ReadString(Main,'DefaultMic','');
+        ADefaultSink := Ini.ReadString(Main,'DefaultSink','');
+        ADefaultMic := Ini.ReadString(Main,'DefaultMic','');
         if Length(AD) > 0 then
           begin
             for I := 0 to Length(AD) -1 do
               begin
-                AD[I].Typ := Ini.ReadInteger(Main,IntToStr(I)+'_Typ',PDT_UnknownDev);   
+                AD[I].Typ := Ini.ReadInteger(Main,IntToStr(I)+'_Typ',PDT_UnknownDev);
+                AD[I].ID := Ini.ReadString(Main,IntToStr(I)+'_ID','');
                 AD[I].Ident := Ini.ReadString(Main,IntToStr(I)+'_Ident','');      
                 AD[I].Name := Ini.ReadString(Main,IntToStr(I)+'_Name','');
                 AD[I].Device_Name := Ini.ReadString(Main,IntToStr(I)+'_Device_Name','');
@@ -1145,27 +1296,48 @@ begin
             for I := 0 to Length(AD) -1 do
               if (AD[I].Typ = PDT_Speaker) and (AD[I].VSink = True) then
                 RunCmd('pactl load-module module-null-sink sink_name="'+AD[I].Device_Name+'" sink_properties=device.description="'+AD[I].Name+'"');  
-            LoadFromPulse;
+            LoadFromPulse;       
+            //Set Defaults:
+            if ADefaultSink <> '' then
+              if Mode_Pipewire = true then
+                RunCMD('pactl set-default-sink "'+ADefaultSink+'"') else
+                RunCMD('pacmd set-default-sink "'+ADefaultSink+'"');
+            if FDefaultMic <> '' then
+              if Mode_Pipewire = true then
+                RunCMD('pactl set-default-source "'+ADefaultMic+'"') else
+                RunCMD('pacmd set-default-source "'+ADefaultMic+'"');
             //Lade Loopbacks:
             for I := 0 to Length(AD) -1 do
               if AD[I].Typ = PDT_Loop then
                 begin
                   //AD[I].ID := '';
-                  for J := 0 to Length(PD) -1 do
-                    if AD[I].Loop_In = PD[J].Name then
+                  for J := 0 to Length(AD) -1 do
+                    if AD[I].RecordingFrom = AD[J].ID then
                       begin
-                        S := PD[J].ID;
+                        for K := 0 to Length(PD) -1 do
+                          If AD[J].Name = PD[K].Name then
+                            begin
+                              S := PD[J].ID;
+                              break;
+                            end;
                         break;
                       end;
-                  for J := 0 to Length(PD) -1 do
-                    if AD[I].Loop_Out = PD[J].Name then
+                  for J := 0 to Length(AD) -1 do
+                    if AD[I].PlayingOn = AD[J].ID then
                       begin
-                        T := PD[J].ID;
+                        for K := 0 to Length(PD) -1 do
+                          If AD[J].Name = PD[K].Name then
+                            begin
+                              T := PD[K].ID;
+                              break;
+                            end;
                         break;
                       end;
-                  RunCMD('pactl load-module module-loopback source='+S+' sink='+T+' latency_msec=10');
+                  If (S <> '') and (T <> '') then
+                    RunCMD('pactl load-module module-loopback source='+S+' sink='+T+' latency_msec='+IntToStr(LoopDelay)) Else
+                    RunCMD('pactl load-module module-loopback latency_msec='+IntToStr(LoopDelay));
                 end;
-            //Link Devices [Mic, Monitor, Rec, Player]:
+            //Set Volumes [Mic, Monitor, Rec, Player]:
             if Length(PD) > 0 then
               for I := 0 to Length(AD) -1 do
                 for J := 0 to Length(PD) -1 do
@@ -1176,7 +1348,8 @@ begin
                       SetVol(J,StrToIntDef(AD[I].Volume,-1));
                       SetMute(J,AD[I].Vol_Muted);
                       break;
-                    end;
+                    end;        
+            LoadFromPulse;
             //Add Cables from Player / Recorder:
             if Length(PD) > 0 then
               for I := 0 to Length(AD) -1 do
@@ -1192,15 +1365,6 @@ begin
                       RunCmd('pactl move-source-output '+AD[I].ID+' '+AD[I].RecordingFrom) else
                       RunCmd('pacmd move-source-output '+AD[I].ID+' '+AD[I].RecordingFrom);
                   end;
-            //Set Defaults:
-            if FDefaultSink <> '' then
-              if Mode_Pipewire = true then
-                RunCMD('pactl set-default-sink "'+FDefaultSink+'"') else
-                RunCMD('pacmd set-default-sink "'+FDefaultSink+'"');
-            if FDefaultMic <> '' then
-              if Mode_Pipewire = true then
-                RunCMD('pactl set-default-source "'+FDefaultMic+'"') else
-                RunCMD('pacmd set-default-source "'+FDefaultMic+'"');
             LoadFromPulse;
           end;
       finally
@@ -1214,12 +1378,19 @@ var
   cmdstr: String;
   pastr: String;
 begin
-  if Mute then
-    cmdstr := ' truepacmd' Else
-    cmdstr := ' false';
   if Mode_Pipewire = True then
-    pastr := 'pactl' else
-    pastr := 'pacmd';
+    begin
+      pastr := 'pactl';
+      if Mute then
+        cmdstr := ' 1' Else
+        cmdstr := ' 0';
+    end else
+    begin
+      pastr := 'pacmd';
+      if Mute then
+        cmdstr := ' true' Else
+        cmdstr := ' false';
+    end;
   if (PD[AID].Typ = PDT_Player) then
     RunCmd(pastr+' set-sink-input-mute '+PD[AID].ID+cmdstr) Else
   if (PD[AID].Typ = PDT_Speaker) then
@@ -1239,12 +1410,12 @@ begin
     pastr := 'pactl' else
     pastr := 'pacmd';
   IVol := -1;
-  if (AVol <> -1) and (AVol >= 0) and (AVol <= 100) then
+  if (AVol <> -1) and (AVol >= 0) and (AVol <= MAX_VOL) then
     begin
       PD[AID].Volume := IntToStr(AVol);
       Devs[AID].D.Volume := IntToStr(AVol);
-      IVol := Round((AVol / 100) * 65535);
-      if (IVol > -1) and (IVol < 65536) then
+      IVol := Round((AVol / MAX_VOL) * 99957);
+      if (IVol > -1) and (IVol < 99957) then
         if (PD[AID].Typ = PDT_Player) then
           RunCMD(pastr+' set-sink-input-volume '+PD[AID].ID+' '+IntToStr(IVol)) Else
         if (PD[AID].Typ = PDT_Speaker) then
@@ -1270,13 +1441,16 @@ begin
       Ini := TIniFile.Create(AFileName);
       try
         Ini.WriteInteger(Main,'Count',Length(PD));
-        Ini.WriteString(Main,'DefaultSink',FDefaultSink);    
-        Ini.WriteString(Main,'DefaultMic',FDefaultMic);
         if Length(PD) > 0 then
           for I := 0 to Length(PD) -1 do
             begin
+              If PD[I].DefaultSink = True then
+                  Ini.WriteString(Main,'DefaultSink',PD[I].Device_Name);    
+              If PD[I].DefaultSource = True then
+                  Ini.WriteString(Main,'DefaultMic',PD[I].Device_Name);
               Ini.WriteInteger(Main,IntToStr(I)+'_Typ',PD[I].Typ);        
               Ini.WriteString(Main,IntToStr(I)+'_Ident',PD[I].Ident);
+              Ini.WriteString(Main,IntToStr(I)+'_ID',PD[I].ID);
               Ini.WriteString(Main,IntToStr(I)+'_Name',PD[I].Name);
               Ini.WriteString(Main,IntToStr(I)+'_Device_Name',PD[I].Device_Name);
               S := PD[I].PlayingOn;
@@ -1307,9 +1481,7 @@ begin
             begin
               Ini.WriteInteger(Main,'CardsCount',Length(PC));
               for I := 0 to Length(PC) -1 do
-                if (PC[I].PulseName <> '') and (PC[I].CurrentProp > 0) and (PC[I].Props[PC[I].CurrentProp].PulseName <> '') then
-                  Ini.WriteString(Main,IntToStr(I)+'_Card',PC[I].PulseName+'" "'+PC[I].Props[PC[I].CurrentProp].PulseName) Else
-                  Ini.WriteString(Main,IntToStr(I)+'_Card','');
+                Ini.WriteString(Main,IntToStr(I)+'_Card',PC[I].PulseName+'" "'+PC[I].Props[PC[I].CurrentProp].PulseName);
             end;
         Result := True;
       finally
@@ -1498,7 +1670,7 @@ begin
                               end;
                 PDT_Speaker: if (K = PDT_Player) or (K = PDT_LoopSpk) then
                               begin
-                                //Speaker --> Anmwendung         
+                                //Speaker --> Anmwendung
                                 RunCmd(pastr+' move-sink-input '+PD[I].ID+' '+PD[FDeviceSelected].Device_Name);
                                 Applied := True;
                               end;
@@ -1553,6 +1725,8 @@ begin
   SelColor := clLime;
   FOldD.Name := '0';
   D := AD;
+  FDefaultSink := D.DefaultSink;
+  FDefaultSource := D.DefaultSource;
   Selected := False;
   X := 20;
   Y := 50;
@@ -1596,15 +1770,15 @@ begin
         Col := clLines;
     Bitmap.Canvas.Pen.Color := Col;
     Bitmap.Canvas.Pen.Width := 3;
+    TX := 5;
+    if (PDT_Loop and D.Typ <> 0) then
+      Bitmap.Canvas.Rectangle(1,1,FWidth-1,FHeight-1) else
     if (PDT_Speaker and D.Typ <> 0) or (PDT_Microfone and D.Typ <> 0) or (PDT_Monitor and D.Typ <> 0) then
       begin
         Bitmap.Canvas.Rectangle(10,1,FWidth-1,FHeight-1);
         TX := 15;
       end Else
-      begin
-        Bitmap.Canvas.Rectangle(1,1,FWidth-10,FHeight-1);
-        TX := 5;
-      end;
+      Bitmap.Canvas.Rectangle(1,1,FWidth-10,FHeight-1);
     //Eingangspfeil (offen) Links / Oben (Audioeingabe / Lautsprecher):
     if (PDT_Speaker and D.Typ <> 0) then
       begin
@@ -1612,14 +1786,14 @@ begin
         Bitmap.Canvas.Line(1,11,10,6);
       end;          
     //Ausgangspfeil (offen) Rechts / Oben (Audioausgabe / Player):
-    if (PDT_Player and D.Typ <> 0) or (PDT_Loop and D.Typ <> 0) then
+    if (PDT_Player and D.Typ <> 0) then
       begin
         Bitmap.Canvas.Line(Fwidth -11,4,Fwidth -11,10);
         Bitmap.Canvas.Line(Fwidth -10,1,Fwidth,6);
         Bitmap.Canvas.Line(Fwidth -10,11,Fwidth,6);
       end;
     //Eingangspfeil (geschlossen) Rechts / Unten (Audioeingabe / Recorder):
-    if (PDT_Recorder and D.Typ <> 0) or (PDT_Loop and D.Typ <> 0) then
+    if (PDT_Recorder and D.Typ <> 0) then
       begin
         Bitmap.Canvas.Line(Fwidth,Fheight-1,Fwidth-10,Fheight-6);
         Bitmap.Canvas.Line(Fwidth,Fheight-11,Fwidth-10,Fheight-6);
@@ -1682,42 +1856,82 @@ end;
 procedure TDevice.FSetCaption;
 const
   VSinkStr = '[V] ';
+  DSinkStr = '[DEF] ';
 var
-  S, T, V: String;
+  S, SS, T, V: String;
 begin
   //Setze die "Caption":
-  If D.VSink = True then
-    S := VSinkStr Else
+  If (FDefaultSink = True) or (FDefaultSource = True) then
+    S := DSinkStr Else
     S := '';
+  If (D.VSink = True) and (D.Typ <> PDT_Monitor) then
+    S := S + VSinkStr;
+  SS := S;
   case D.Typ of
     PDT_Speaker: S := S+'Speaker';
-    PDT_Player: if (S <> '') and (S <> VSinkStr) then
+    PDT_Player: if (S <> '') and (S <> SS) then
                   S := S + ' / Player' Else
                   S := S + 'Player';
-    PDT_Recorder: if (S <> '') and (S <> VSinkStr) then
+    PDT_Recorder: if (S <> '') and (S <> SS) then
                     S := S + ' / Rec' Else
                     S := S +'Rec';
     PDT_Microfone, PDT_Monitor: begin
                                   if PDT_Monitor and D.Typ <> 0 then
                                     T := 'Monitor' Else
                                     T := 'Mic';
-                                  if (S <> '') and (S <> VSinkStr) then
+                                  if (S <> '') and (S <> SS) then
                                     S := S + ' / '+T Else
                                     S := S + T;
                                 end;
-    end;
+  end;
   FSecCaption := '';
   If D.Volume <> '' then
     V := ' ['+D.Volume+'%] ' Else
     V := '';
   if (D.Typ = PDT_Loop) then
-    FMainCaption := 'LOOP' Else
+    FMainCaption := 'L' Else
   if (D.Typ = PDT_Monitor) then
     FMainCaption := S+V Else
     begin
       FMainCaption := S+V+':';
       FSecCaption := D.Name;
     end;
+end;
+
+procedure TDevice.FSetDefaultSink(ADefault: Boolean);  
+var
+  pastr: String;
+begin
+  If (D.Typ <> PDT_Speaker) then
+    exit;
+  If (ADefault = True) and (FDefaultSink = False) then
+    begin
+      if Mode_Pipewire = True then
+        pastr := 'pactl' else
+        pastr := 'pacmd';
+        RunCMD(pastr+' set-default-sink "'+D.Device_Name+'"');
+        Dev.LoadFromPulse;
+    end;  
+  FDefaultSink := ADefault;
+  D.DefaultSink := ADefault;
+end;
+
+procedure TDevice.FSetDefaultSource(ADefault: Boolean);
+var
+  pastr: String;
+begin
+  If (D.Typ <> PDT_Microfone) and (D.Typ <> PDT_Monitor) then
+    exit;
+  If (ADefault = True) and (FDefaultSource = False) then
+    begin
+      if Mode_Pipewire = True then
+        pastr := 'pactl' else
+        pastr := 'pacmd';
+        RunCMD(pastr+' set-default-source "'+D.Device_Name+'"');
+        Dev.LoadFromPulse;
+    end;
+  FDefaultSource := ADefault;
+  D.DefaultSource := ADefault;
 end;
 
 function TDevice.GetWidth: Integer;
@@ -1734,7 +1948,13 @@ begin
       S := S + '..';
     end;
   MainFrm.CalcLab.Caption := S;
-  L1 := 25 + MainFrm.CalcLab.Canvas.TextWidth(S);  
+  If (D.Typ = PDT_Loop) then
+    begin
+      Result := 15 + MainFrm.CalcLab.Canvas.TextWidth(S);
+      FWidth := Result;
+      exit;
+    end;
+  L1 := 25 + MainFrm.CalcLab.Canvas.TextWidth(S);
   S := FSecCaption;
   If Length(S) > MAX_CAPSIZE+2 then
     begin
@@ -1876,7 +2096,8 @@ begin
     Ini.WriteBool(Ini_Main,'AutoReload',M01_OP_AutoReload.Checked);
     Ini.WriteBool(Ini_Main,'HideCards',M01_OP_HideCards.Checked);
     Ini.WriteBool(Ini_Main,'OnTop',M01_OP_OnTop.Checked);
-    Ini.WriteBool(Ini_Main, 'Pipewire', Mode_Pipewire);
+    Ini.WriteBool(Ini_Main, 'Pipewire', Mode_Pipewire);     
+    Ini.WriteInteger(Ini_Main,'LoopDelay',LoopDelay);
     Ini.WriteInteger(Ini_File,'Count',RecentFiles.Count);
     If RecentFiles.Count > 0 then
       for I := 0 to RecentFiles.Count -1 do
@@ -1936,6 +2157,10 @@ begin
       FormStyle:=fsNormal;
     M01_OP_Mode_Pipewire.Checked := Ini.ReadBool(Ini_Main, 'Pipewire', False);
     Mode_Pipewire := M01_OP_Mode_Pipewire.Checked;
+    LoopDelay := Ini.ReadInteger(Ini_Main, 'LoopDelay', 10);
+    If LoopDelay < 0 then
+      LoopDelay := 10;
+    M01_OP_LoopDelay.Caption := 'Loop-Latency: '+IntToStr(LoopDelay)+'ms';
     FCnt := Ini.ReadInteger(Ini_File,'Count',0);
     If FCnt > 0 then
       for I := 0 to FCnt -1 do
@@ -1952,6 +2177,8 @@ begin
   If (ParamStr(1) <> '') and (FileExists(ParamStr(1))) then
     Dev.LoadFromFile(ParamStr(1)) Else
     Dev.LoadFromPulse;
+  If ParamStr(2) = '-close' then
+    Close;
 end;
 
 procedure TMainFRM.UpdateLoadMenu;
@@ -2028,6 +2255,20 @@ begin
   Dev.LoadFromPulse(True);
 end;
 
+procedure TMainFRM.M01_OP_LoopDelayClick(Sender: TObject);
+var
+  Str: String;
+begin
+  Str:=InputBox('Loop Latency','Please enter a latency:','');
+  If StrToIntDef(Str,-1) = -1 then
+    begin
+      ShowMessage('Please enter a valid number.');
+      exit;
+    end;
+  LoopDelay := StrToInt(Str);
+  M01_OP_LoopDelay.Caption := 'Loop-Latency: '+IntToStr(LoopDelay)+'ms';
+end;
+
 procedure TMainFRM.M01_OP_Mode_PipewireClick(Sender: TObject);
 begin
   M01_OP_Mode_Pipewire.Checked := not M01_OP_Mode_Pipewire.Checked;
@@ -2071,7 +2312,7 @@ end;
 
 procedure TMainFRM.M02_AddLoopClick(Sender: TObject);
 begin
-  RunCMD('pactl load-module module-loopback latency_msec=10');
+  RunCMD('pactl load-module module-loopback latency_msec='+IntToStr(LoopDelay));
   Dev.LoadFromPulse;
 end;
 
@@ -2140,6 +2381,13 @@ begin
   Dev.LoadFromPulse;
 end;
 
+procedure TMainFRM.RC_SetDefClick(Sender: TObject);
+begin
+  If (Dev.PD[RC_Dev].Typ = PDT_Speaker) then
+    Dev.Devs[RC_Dev].DefaultSink := True else
+    Dev.Devs[RC_Dev].DefaultSource := True;
+end;
+
 procedure TMainFRM.SBMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
@@ -2160,12 +2408,10 @@ end;
 
 procedure TMainFRM.PB_NewLineMouseMove(Sender: TObject; Shift: TShiftState; X,
   Y: Integer);
-var
-  P: TPoint;
 begin
-  P.X := X;
-  P.Y := Y;
-  Dev.DoCableMove(P);
+  FCurMouseP.X := X;
+  FCurMouseP.Y := Y;
+  Dev.DoCableMove(FCurMouseP);
 end;
 
 procedure TMainFRM.PB_NewLineMouseWheelDown(Sender: TObject; Shift: TShiftState;
@@ -2202,7 +2448,7 @@ begin
         begin
           Handled := True;
           IVol := StrToIntDef(Dev.PD[I].Volume,-1);
-          if (IVol <> -1) and (IVol < 100) then
+          if (IVol <> -1) and (IVol < MAX_VOL) then
             begin
               IVol := IVol +1;
               Dev.SetVol(I,IVol); 
@@ -2246,8 +2492,11 @@ begin
         for I := 0 to Length(Dev.PD) -1 do
           if Dev.CheckSelectedDevice(I,P) then
             begin
-              if (Dev.PD[I].Typ = PDT_Loop) or
-                 (Dev.PD[I].VSink = True) then
+              RC_Del.Visible := (Dev.PD[I].Typ = PDT_Loop) or (Dev.PD[I].VSink = True);
+              RC_SetDef.Visible := ((Dev.PD[I].Typ = PDT_Speaker) or (Dev.PD[I].Typ = PDT_Microfone) or (Dev.PD[I].Typ = PDT_Monitor))
+                                   and ((Dev.PD[I].DefaultSink = False) and (Dev.PD[I].DefaultSource = False));
+              if (RC_Del.Visible = True) or
+                 (RC_SetDef.Visible = True) then
                  begin
                    RC_Dev := I;
                    RC.PopUp;

@@ -310,8 +310,8 @@ object MainFRM: TMainFRM
     VertScrollBar.Page = 336
     VertScrollBar.Tracking = True
     Align = alClient
-    ClientHeight = 496
-    ClientWidth = 535
+    ClientHeight = 494
+    ClientWidth = 533
     Color = clWhite
     ParentColor = False
     ParentFont = False
@@ -395,6 +395,10 @@ object MainFRM: TMainFRM
           ShowAlwaysCheckable = True
           OnClick = M01_OP_Mode_PipewireClick
         end
+        object M01_OP_LoopDelay: TMenuItem
+          Caption = 'Loop-Latency: '
+          OnClick = M01_OP_LoopDelayClick
+        end
       end
       object M01_Exit: TMenuItem
         Caption = 'Exit'
@@ -432,9 +436,11 @@ object MainFRM: TMainFRM
     end
     object M3_DefSpeakers: TMenuItem
       Caption = 'Default Speaker'
+      Visible = False
     end
     object M4_DefMicrofone: TMenuItem
       Caption = 'Default Mic'
+      Visible = False
     end
     object M5_CardConfig: TMenuItem
       Caption = 'Card Config'
@@ -448,8 +454,12 @@ object MainFRM: TMainFRM
     Left = 296
     Top = 212
     object RC_Del: TMenuItem
-      Caption = 'Delete...'
+      Caption = 'Delete'
       OnClick = RC_DelClick
+    end
+    object RC_SetDef: TMenuItem
+      Caption = 'Set as Default'
+      OnClick = RC_SetDefClick
     end
   end
   object AutoT: TTimer
