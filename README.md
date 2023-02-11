@@ -158,7 +158,7 @@ Known problems:
 - The Loading and Saving of configs is probably a little bugged, even more when devices,.. are not present
 - On some devices I'm getting problems myself to run my x86_64 build, because of the usage of a too new libc
   on my compilers side, switching to the i386 build works fine for me on probably all machines I'm using this tool on.
-- Equalizers may 
+- Equalizers like PulseEffects might trigger weird effects, I'm not into this tools a lot.
 
 Requirements:
 - An installed PulseAudio or Pipewire server
